@@ -20,5 +20,13 @@ public class Main {
             ctx.result(gson.toJson(status));
         });
 
+        app.get("/data", ctx -> {
+            Map<String, String> data = Map.of(
+                    "service", "example-service",
+                    "data", "running"
+            );
+            ctx.result(gson.toJson(data));
+        });
+
     }
 }
