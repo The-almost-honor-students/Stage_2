@@ -10,8 +10,8 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>ingestion-service</module>
-        <module>indexing-service</module>
-        <module>search-service</module>
+        <module>ingestion</module>
+        <module>indexing</module>
+        <module>search</module>
     </modules>
 </project>
