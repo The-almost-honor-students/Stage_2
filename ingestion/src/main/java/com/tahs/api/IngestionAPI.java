@@ -2,7 +2,7 @@ package com.tahs.api;
 
 import io.javalin.Javalin;
 import io.javalin.http.Context;
-import com.tahs.BookFunctions;
+import com.tahs.IngestionFunctions;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -32,7 +32,7 @@ public class IngestionAPI {
         int bookId = Integer.parseInt(ctx.pathParam("book_id"));
         System.out.println("[API] Received ingestion request for book " + bookId);
 
-        boolean ok = BookFunctions.downloadBook(bookId, STAGING_PATH);
+        boolean ok = IngestionFunctions.downloadBook(bookId, STAGING_PATH);
         if (!ok) {
             ctx.status(400).json(Map.of(
                     "book_id", bookId,
@@ -42,7 +42,7 @@ public class IngestionAPI {
             return;
         }
 
-        boolean datalakeOk = BookFunctions.createDatalake(bookId, STAGING_PATH);
+        boolean datalakeOk = IngestionFunctions.createDatalake(bookId, STAGING_PATH);
         if (!datalakeOk) {
             ctx.status(500).json(Map.of(
                     "book_id", bookId,
