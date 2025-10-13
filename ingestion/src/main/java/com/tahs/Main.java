@@ -16,6 +16,7 @@ public class Main {
 
     private static final Random random = new Random();
 
+    @SuppressWarnings("resource")
     public static void main(String[] args) {
         System.out.println("[INGESTION] Starting continuous download cycle (1 book/second)...");
 
@@ -28,14 +29,27 @@ public class Main {
         }
 
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        scheduler.scheduleAtFixedRate(Main::downloadCycle, 0, 1, TimeUnit.SECONDS);
 
-        // Keep the program running
         try {
+            scheduler.scheduleAtFixedRate(Main::downloadCycle, 0, 1, TimeUnit.SECONDS);
+
+            // Keep the program running
             Thread.currentThread().join();
+
         } catch (InterruptedException e) {
             System.out.println("[CONTROL] Interrupted, shutting down scheduler...");
+
+        } finally {
+            // Ensure the scheduler is always shut down
             scheduler.shutdown();
+            try {
+                if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                    scheduler.shutdownNow();
+                }
+            } catch (InterruptedException ex) {
+                scheduler.shutdownNow();
+            }
+            System.out.println("[CONTROL] Scheduler stopped.");
         }
     }
 

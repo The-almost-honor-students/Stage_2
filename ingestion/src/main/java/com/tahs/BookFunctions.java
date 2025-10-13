@@ -23,6 +23,7 @@ public class BookFunctions {
      * @param outputPath The local folder to save the downloaded files.
      * @return true if download was successful, false otherwise.
      */
+    @SuppressWarnings("resource")
     public static boolean downloadBook(int bookId, String outputPath) {
         try {
             Path outputDir = Paths.get(outputPath);
