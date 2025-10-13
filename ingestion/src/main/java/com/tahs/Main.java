@@ -65,9 +65,9 @@ public class Main {
                 }
 
                 System.out.println("[CONTROL] Downloading new book with ID " + candidateId + "...");
-                boolean ok = BookFunctions.downloadBook(candidateId, STAGING_PATH);
+                boolean ok = IngestionFunctions.downloadBook(candidateId, STAGING_PATH);
                 if (ok) {
-                    boolean datalakeOk = BookFunctions.createDatalake(candidateId, STAGING_PATH);
+                    boolean datalakeOk = IngestionFunctions.createDatalake(candidateId, STAGING_PATH);
                     if (datalakeOk) {
                         appendDownloadedId(candidateId);
                         System.out.println("[CONTROL] Book " + candidateId + " downloaded and moved to datalake successfully.");
