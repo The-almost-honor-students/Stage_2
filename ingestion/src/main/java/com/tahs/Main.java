@@ -3,9 +3,8 @@ package com.tahs;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.HashSet;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.*;
 
 public class Main {
 
@@ -15,38 +14,58 @@ public class Main {
     private static final int TOTAL_BOOKS = 70000;
     private static final int MAX_RETRIES = 10;
 
+    private static final Random random = new Random();
+
     public static void main(String[] args) {
-        System.out.println("[INGESTION] Iniciando ciclo de descarga...");
+        System.out.println("[INGESTION] Starting continuous download cycle (1 book/second)...");
+
         try {
             Files.createDirectories(CONTROL_PATH);
             Files.createDirectories(Paths.get(STAGING_PATH));
+        } catch (IOException e) {
+            System.out.println("[ERROR] Could not create required directories: " + e.getMessage());
+            return;
+        }
 
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        scheduler.scheduleAtFixedRate(Main::downloadCycle, 0, 1, TimeUnit.SECONDS);
+
+        // Keep the program running
+        try {
+            Thread.currentThread().join();
+        } catch (InterruptedException e) {
+            System.out.println("[CONTROL] Interrupted, shutting down scheduler...");
+            scheduler.shutdown();
+        }
+    }
+
+    private static void downloadCycle() {
+        try {
             Set<String> downloaded = readDownloadedIds();
-            Random random = new Random();
 
             for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
                 int candidateId = random.nextInt(TOTAL_BOOKS) + 1;
                 if (downloaded.contains(String.valueOf(candidateId))) {
-                    System.out.println("[INFO] Libro " + candidateId + " ya descargado, buscando otro...");
+                    System.out.println("[INFO] Book " + candidateId + " already downloaded, looking for another one...");
                     continue;
                 }
 
-                System.out.println("[CONTROL] Descargando nuevo libro con ID " + candidateId + "...");
+                System.out.println("[CONTROL] Downloading new book with ID " + candidateId + "...");
                 boolean ok = BookFunctions.downloadBook(candidateId, STAGING_PATH);
                 if (ok) {
                     boolean datalakeOk = BookFunctions.createDatalake(candidateId, STAGING_PATH);
                     if (datalakeOk) {
                         appendDownloadedId(candidateId);
-                        System.out.println("[CONTROL] Libro " + candidateId + " descargado y movido al datalake correctamente.");
-                        return;
+                        System.out.println("[CONTROL] Book " + candidateId + " downloaded and moved to datalake successfully.");
+                        return; // End this cycle; the next one starts in 1 second
                     }
                 }
             }
 
-            System.out.println("[CONTROL] No se encontró un nuevo libro válido en este ciclo.");
+            System.out.println("[CONTROL] No valid new book found in this cycle.");
 
-        } catch (IOException e) {
-            System.out.println("[ERROR] Error general en ingestion: " + e.getMessage());
+        } catch (Exception e) {
+            System.out.println("[ERROR] Failure during download cycle: " + e.getMessage());
         }
     }
 
@@ -66,7 +85,7 @@ public class Main {
                     StandardOpenOption.CREATE,
                     StandardOpenOption.APPEND);
         } catch (IOException e) {
-            System.out.println("[WARN] No se pudo registrar el ID descargado " + id + ": " + e.getMessage());
+            System.out.println("[WARN] Could not register downloaded ID " + id + ": " + e.getMessage());
         }
     }
 }

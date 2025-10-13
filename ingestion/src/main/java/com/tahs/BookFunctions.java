@@ -16,6 +16,13 @@ public class BookFunctions {
     private static final String START_MARKER = "*** START OF THE PROJECT GUTENBERG EBOOK";
     private static final String END_MARKER = "*** END OF THE PROJECT GUTENBERG EBOOK";
 
+    /**
+     * Downloads a book from Project Gutenberg and saves its header and body separately.
+     *
+     * @param bookId     The ID of the book to download.
+     * @param outputPath The local folder to save the downloaded files.
+     * @return true if download was successful, false otherwise.
+     */
     public static boolean downloadBook(int bookId, String outputPath) {
         try {
             Path outputDir = Paths.get(outputPath);
@@ -31,13 +38,13 @@ public class BookFunctions {
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() != 200) {
-                System.out.println("[ERROR] HTTP " + response.statusCode() + " al descargar libro " + bookId);
+                System.out.println("[ERROR] HTTP " + response.statusCode() + " when downloading book " + bookId);
                 return false;
             }
 
             String text = response.body();
             if (!text.contains(START_MARKER) || !text.contains(END_MARKER)) {
-                System.out.println("[WARN] Marcadores no encontrados en el libro " + bookId);
+                System.out.println("[WARN] Start/End markers not found in book " + bookId);
                 return false;
             }
 
@@ -52,15 +59,22 @@ public class BookFunctions {
             Files.writeString(bodyPath, body, StandardCharsets.UTF_8);
             Files.writeString(headerPath, header, StandardCharsets.UTF_8);
 
-            System.out.println("[INFO] Libro " + bookId + " descargado en " + outputDir.toAbsolutePath());
+            System.out.println("[INFO] Book " + bookId + " downloaded to " + outputDir.toAbsolutePath());
             return true;
 
         } catch (IOException | InterruptedException e) {
-            System.out.println("[ERROR] Descarga fallida para libro " + bookId + ": " + e.getMessage());
+            System.out.println("[ERROR] Download failed for book " + bookId + ": " + e.getMessage());
             return false;
         }
     }
 
+    /**
+     * Moves downloaded book files into the structured datalake folder.
+     *
+     * @param bookId       The ID of the book.
+     * @param downloadPath The folder where the book was downloaded.
+     * @return true if the move was successful, false otherwise.
+     */
     public static boolean createDatalake(int bookId, String downloadPath) {
         try {
             String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -74,7 +88,7 @@ public class BookFunctions {
             Path headerSrc = downloadsDir.resolve(bookId + "_header.txt");
 
             if (!Files.exists(bodySrc) || !Files.exists(headerSrc)) {
-                System.out.println("[ERROR] Archivos no encontrados en " + downloadsDir.toAbsolutePath());
+                System.out.println("[ERROR] Files not found in " + downloadsDir.toAbsolutePath());
                 return false;
             }
 
@@ -84,11 +98,11 @@ public class BookFunctions {
             Files.move(bodySrc, bodyDst, StandardCopyOption.REPLACE_EXISTING);
             Files.move(headerSrc, headerDst, StandardCopyOption.REPLACE_EXISTING);
 
-            System.out.println("[INFO] Archivos movidos al datalake en " + datalakeDir.toAbsolutePath());
+            System.out.println("[INFO] Files moved to datalake at " + datalakeDir.toAbsolutePath());
             return true;
 
         } catch (IOException e) {
-            System.out.println("[ERROR] Fallo al mover archivos al datalake: " + e.getMessage());
+            System.out.println("[ERROR] Failed to move files to datalake: " + e.getMessage());
             return false;
         }
     }
