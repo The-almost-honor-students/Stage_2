@@ -1,7 +1,14 @@
 package com.tahs.application.ports;
 
+import com.tahs.domain.Book;
+import java.util.List;
+import java.util.Map;
+
 public interface InvertedIndexRepository {
-    void updateIndex(String bookId);
-    void rebuildIndex();
-    void getIndexStatus();
+
+    boolean indexBook(Book book);
+
+    List<Integer> getIndexByTerm(String term);
+
+    Map<String, Integer> getIndexStats();
 }
