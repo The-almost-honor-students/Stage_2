@@ -1,5 +1,8 @@
 package com.tahs;
 
+import com.tahs.application.usecase.IndexService;
+import com.tahs.infrastructure.persistence.MongoInvertedIndexRepository;
+import com.tahs.infrastructure.persistence.MongoMetadataRepository;
 import io.javalin.Javalin;
 import com.google.gson.Gson;
 
@@ -33,6 +36,11 @@ public class Main {
         app.post("/index/update/{book_id}", ctx -> {
             String bookId = ctx.pathParam("book_id");
             System.out.println("Indexing book " + bookId + "...");
+            MongoInvertedIndexRepository indexRepository = new MongoInvertedIndexRepository();
+            MongoMetadataRepository metadataRepository = new MongoMetadataRepository();
+            var indexService = new IndexService(indexRepository, metadataRepository);
+            indexService.updateByBookId(bookId);
+
             // TODO: Implement update index logic
             // ...
             //...
