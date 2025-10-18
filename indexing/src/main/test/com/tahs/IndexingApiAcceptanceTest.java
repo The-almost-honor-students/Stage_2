@@ -30,7 +30,7 @@ public class IndexingApiAcceptanceTest {
                 .send(indexUpdateCall, HttpResponse.BodyHandlers.ofString());
 
         assertEquals(200, response.statusCode());
-        assertEquals("{\"index\":\"updated\",\"book_id\":\"1\"}", response.body());
+        assertEquals("{\"book_id\":\"1\",\"index\":\"updated\"}", response.body());
     }
 
     private HttpRequest CreateHttpPostCall(String url) {
