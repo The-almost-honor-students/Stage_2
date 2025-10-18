@@ -1,7 +1,9 @@
 package com.tahs.application.ports;
 
+import com.tahs.domain.Book;
+
 public interface MetadataRepository {
-    void updateMetadata(String bookId);
+    void save(Book book);
     void rebuildMetadata();
     void getMetadataStatus();
 }
