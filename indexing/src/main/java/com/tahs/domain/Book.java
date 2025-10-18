@@ -2,6 +2,7 @@ package com.tahs.domain;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public class Book {
 
@@ -40,5 +41,17 @@ public class Book {
         map.put("author", author);
         map.put("language", language);
         return map;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        Book book = (Book) o;
+        return Objects.equals(bookId, book.bookId) && Objects.equals(title, book.title) && Objects.equals(author, book.author) && Objects.equals(language, book.language);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(bookId, title, author, language);
     }
 }
