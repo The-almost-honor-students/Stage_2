@@ -1,10 +1,16 @@
 package com.tahs;
 
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
 import com.tahs.application.usecase.IndexService;
 import com.tahs.infrastructure.persistence.MongoInvertedIndexRepository;
 import com.tahs.infrastructure.persistence.MongoMetadataRepository;
+import com.tahs.infrastructure.serialization.books.GutenbergHeaderSerializer;
 import io.javalin.Javalin;
 import com.google.gson.Gson;
+import org.bson.Document;
 
 
 import java.time.LocalDateTime;
@@ -21,8 +27,16 @@ public class Main {
     public static Javalin createApp() {
         Javalin app = Javalin.create(config -> {
             config.http.defaultContentType = "application/json";
-        }).start(8080);
+        });
         Gson gson = new Gson();
+        var mongoClient = MongoClients.create("mongodb://localhost:27017");
+        var database = "books";
+        var collection = "metadata";
+
+        var indexRepository = new MongoInvertedIndexRepository();
+        var metadataRepository = new MongoMetadataRepository(mongoClient,database,collection);
+        var gutenbergHeaderSerializer = new GutenbergHeaderSerializer();
+        var indexService = new IndexService(indexRepository, metadataRepository,gutenbergHeaderSerializer);
 
         app.get("/index/status", ctx -> {
             Map<String, Object> status = Map.of(
@@ -36,15 +50,7 @@ public class Main {
         app.post("/index/update/{book_id}", ctx -> {
             String bookId = ctx.pathParam("book_id");
             System.out.println("Indexing book " + bookId + "...");
-            MongoInvertedIndexRepository indexRepository = new MongoInvertedIndexRepository();
-            MongoMetadataRepository metadataRepository = new MongoMetadataRepository();
-            var indexService = new IndexService(indexRepository, metadataRepository);
             indexService.updateByBookId(bookId);
-
-            // TODO: Implement update index logic
-            // ...
-            //...
-            //...
             Map<String, Object> response = Map.of(
                     "book_id", bookId,
                     "index", "updated"
