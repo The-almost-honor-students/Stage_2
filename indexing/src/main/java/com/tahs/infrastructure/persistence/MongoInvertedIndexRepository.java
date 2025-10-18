@@ -13,10 +13,8 @@ public class MongoInvertedIndexRepository implements InvertedIndexRepository {
     private final Map<String, List<Integer>> index = new HashMap<>();
 
     @Override
-    public boolean indexBook(Book book) {
-        if (book == null || book.getTitle() == null) return false;
-        index.computeIfAbsent(book.getTitle().toLowerCase(), k -> new ArrayList<>()).add(book.getBookId());
-        return true;
+    public boolean indexBook(String bookId) {
+        return false;
     }
 
     @Override

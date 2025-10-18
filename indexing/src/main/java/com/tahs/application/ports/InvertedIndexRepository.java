@@ -6,7 +6,7 @@ import java.util.Map;
 
 public interface InvertedIndexRepository {
 
-    boolean indexBook(Book book);
+    boolean indexBook(String book_id);
 
     List<Integer> getIndexByTerm(String term);
 
