@@ -1,4 +1,4 @@
-package com.tahs.infrastructure;
+package com.tahs.infrastructure.serialization.books;
 
 import com.tahs.domain.Book;
 import com.tahs.infrastructure.serialization.books.GutenbergHeaderSerializer;
