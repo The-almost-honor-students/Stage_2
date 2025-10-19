@@ -22,7 +22,7 @@ public class GutenbergHeaderSerializer {
         return deserializeBookFromText(readTextBook);
     }
 
-    private String readFile(String text) throws IOException {
+    public String readFile(String text) throws IOException {
         return Files.readString(Path.of(text), StandardCharsets.UTF_8);
     }
 

@@ -1,9 +1,9 @@
 package com.tahs.application.usecase;
 
+import com.tahs.domain.BookSection;
 import com.tahs.application.ports.InvertedIndexRepository;
 import com.tahs.application.ports.MetadataRepository;
 import com.tahs.infrastructure.serialization.books.GutenbergHeaderSerializer;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -27,29 +27,34 @@ public class IndexService {
 
     public void updateByBookId(String bookId) throws IOException {
         updateMetadata(bookId);
-//        indexRepository.indexBook(bookId);
+        updateIndexWords(bookId);
+    }
+
+    private void updateIndexWords(String bookId) throws IOException {
+        var bookPath = findBookInDatalakeById(bookId, BookSection.BODY.fileSuffix());
+        var text = this.gutenbergHeaderSerializer.readFile(bookPath);
+        
+        indexRepository.indexBook(bookId);
     }
 
     private void updateMetadata(String bookId) throws IOException {
-        var bookPath = findBookInDatalakeById(bookId);
-        var bookHeader =this.gutenbergHeaderSerializer.deserialize(bookPath);
+        var bookPath = findBookInDatalakeById(bookId, BookSection.HEADER.fileSuffix());
+        var bookHeader = this.gutenbergHeaderSerializer.deserialize(bookPath);
         metadataRepository.save(bookHeader);
     }
 
-    private String findBookInDatalakeById(String bookId) {
+    private String findBookInDatalakeById(String bookId,String bookSection) {
         if (bookId == null || bookId.isBlank()) {
-            throw new IllegalArgumentException("bookId no puede ser nulo o vacío");
+            throw new IllegalArgumentException("bookId cannot be null or Empty");
         }
 
-        var fileName = bookId + ".header.txt";
+        var fileName = bookId + "." + bookSection + ".txt";
         Path cwd = Path.of("").toAbsolutePath().normalize();  // 👈 This is the current working directory
         Path parent = cwd.getParent() != null ? cwd.getParent() : cwd;
 
         List<Path> roots = List.of(
                 cwd.resolve("datalake"),
-                cwd.resolve("isdatalake"),
-                parent.resolve("datalake"),
-                parent.resolve("isdatalake")
+                parent.resolve("datalake")
         );
 
         for (Path root : roots) {
@@ -65,11 +70,11 @@ public class IndexService {
                     return found.get().toString();
                 }
             } catch (IOException e) {
-                throw new UncheckedIOException("Error al buscar en " + root, e);
+                throw new UncheckedIOException("Error searching in " + root, e);
             }
         }
 
-        throw new IllegalStateException(new NoSuchFileException("No se encontró " + fileName + " en el datalake"));
+        throw new IllegalStateException(new NoSuchFileException("Not found " + fileName + " in datalake"));
     }
 
 }
