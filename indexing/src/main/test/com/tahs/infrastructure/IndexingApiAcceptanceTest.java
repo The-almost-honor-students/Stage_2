@@ -1,23 +1,20 @@
-package com.tahs;
+package com.tahs.infrastructure;
 
+import com.tahs.Main;
 import io.javalin.Javalin;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-
+import org.junit.jupiter.api.*;
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.net.http.*;
 
+import static com.tahs.Main.createApp;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class IndexingApiAcceptanceTest {
     private static Javalin app;
     @BeforeAll
     static void setup() {
-        app = Main.createApp();
+        app = createApp().start(8080);
     }
     @AfterAll
     static void stop() { app.stop(); }

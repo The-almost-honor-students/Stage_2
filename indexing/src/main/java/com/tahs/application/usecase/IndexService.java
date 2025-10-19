@@ -9,6 +9,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Stream;
 
 public class IndexService {
@@ -41,11 +42,15 @@ public class IndexService {
         }
 
         var fileName = bookId + ".header.txt";
+        Path cwd = Path.of("").toAbsolutePath().normalize();  // 👈 This is the current working directory
+        Path parent = cwd.getParent() != null ? cwd.getParent() : cwd;
 
-        // Raíces candidatas: producción y entorno de pruebas
-        Path[] roots = new Path[] {
-                Path.of("datalake"),
-        };
+        List<Path> roots = List.of(
+                cwd.resolve("datalake"),
+                cwd.resolve("isdatalake"),
+                parent.resolve("datalake"),
+                parent.resolve("isdatalake")
+        );
 
         for (Path root : roots) {
             if (!Files.exists(root)) continue;
