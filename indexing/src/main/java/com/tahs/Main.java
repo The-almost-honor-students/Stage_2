@@ -31,10 +31,11 @@ public class Main {
         Gson gson = new Gson();
         var mongoClient = MongoClients.create("mongodb://localhost:27017");
         var database = "books";
-        var collection = "metadata";
+        var collection_metadata = "metadata";
+        var collection_index = "inverted_index";
 
-        var indexRepository = new MongoInvertedIndexRepository();
-        var metadataRepository = new MongoMetadataRepository(mongoClient,database,collection);
+        var indexRepository = new MongoInvertedIndexRepository(mongoClient,database,collection_index);
+        var metadataRepository = new MongoMetadataRepository(mongoClient,database,collection_metadata);
         var gutenbergHeaderSerializer = new GutenbergHeaderSerializer();
         var indexService = new IndexService(indexRepository, metadataRepository,gutenbergHeaderSerializer);
 

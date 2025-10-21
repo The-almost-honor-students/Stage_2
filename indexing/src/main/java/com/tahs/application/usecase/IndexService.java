@@ -4,12 +4,16 @@ import com.tahs.domain.BookSection;
 import com.tahs.application.ports.InvertedIndexRepository;
 import com.tahs.application.ports.MetadataRepository;
 import com.tahs.infrastructure.serialization.books.GutenbergHeaderSerializer;
+import com.tahs.infrastructure.serialization.books.TextTokenizer;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.text.Normalizer;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 
 public class IndexService {
@@ -33,8 +37,8 @@ public class IndexService {
     private void updateIndexWords(String bookId) throws IOException {
         var bookPath = findBookInDatalakeById(bookId, BookSection.BODY.fileSuffix());
         var text = this.gutenbergHeaderSerializer.readFile(bookPath);
-        
-        indexRepository.indexBook(bookId);
+        var terms = TextTokenizer.extractTerms(text);
+        indexRepository.indexBook(bookId,terms);
     }
 
     private void updateMetadata(String bookId) throws IOException {
