@@ -1,21 +1,21 @@
 package com.tahs;
 
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonPrimitive;
+import com.google.gson.JsonSerializer;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
 import com.tahs.application.usecase.IndexService;
 import com.tahs.infrastructure.persistence.MongoInvertedIndexRepository;
 import com.tahs.infrastructure.persistence.MongoMetadataRepository;
 import com.tahs.infrastructure.serialization.books.GutenbergHeaderSerializer;
 import io.javalin.Javalin;
 import com.google.gson.Gson;
-import org.bson.Document;
+import org.jetbrains.annotations.NotNull;
 
-
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
 
@@ -25,25 +25,22 @@ public class Main {
     }
 
     public static Javalin createApp() {
-        Javalin app = Javalin.create(config -> {
-            config.http.defaultContentType = "application/json";
-        });
-        Gson gson = new Gson();
-        var mongoClient = MongoClients.create("mongodb://localhost:27017");
-        var database = "books";
-        var collection_metadata = "metadata";
-        var collection_index = "inverted_index";
+        Javalin app = Javalin.create(config -> config.http.defaultContentType = "application/json");
+        Gson gson = new GsonBuilder()
+                .registerTypeAdapter(Instant.class,
+                        (JsonSerializer<Instant>) (src, typeOfSrc, context) ->
+                                src == null ? null : new JsonPrimitive(src.toString()))
+                .create();
 
-        var indexRepository = new MongoInvertedIndexRepository(mongoClient,database,collection_index);
-        var metadataRepository = new MongoMetadataRepository(mongoClient,database,collection_metadata);
-        var gutenbergHeaderSerializer = new GutenbergHeaderSerializer();
-        var indexService = new IndexService(indexRepository, metadataRepository,gutenbergHeaderSerializer);
+        var mongoClient = MongoClients.create("mongodb://localhost:27017");
+        var indexService = getIndexService(mongoClient);
 
         app.get("/index/status", ctx -> {
+            var stats = indexService.getStats();
             Map<String, Object> status = Map.of(
-                    "books_indexed", 1200,
-                    "last_update", "2025-10-08T14:05:00Z",
-                    "index_size_MB", 42.7
+                    "books_indexed", stats.books_indexed(),
+                    "last_update", stats.lastUpdate(),
+                    "index_size_MB", stats.sizeMB()
             );
             ctx.result(gson.toJson(status));
         });
@@ -60,18 +57,31 @@ public class Main {
         });
 
         app.post("/index/rebuild", ctx -> {
-            String bookId = ctx.pathParam("book_id");
-
-            System.out.println("Indexing book " + bookId + "...");
-
+            System.out.println("Rebuild Index ...");
+            long start = System.currentTimeMillis();
+            indexService.rebuildIndex();
+            long finish = System.currentTimeMillis();
+            long timeElapsed = finish - start;
+            var allBooks = indexService.getAllBooks();
             Map<String, Object> response = Map.of(
-                    "books_processed", bookId,
-                    "elapsed_time", "35.2s"
+                    "books_processed", allBooks.size(),
+                    "elapsed_time", TimeUnit.MILLISECONDS.toSeconds(timeElapsed) +"s"
             );
-
             ctx.result(gson.toJson(response));
         });
 
         return app;
+    }
+
+    @NotNull
+    private static IndexService getIndexService(MongoClient mongoClient) {
+        var database = "books";
+        var collection_metadata = "metadata";
+        var collection_index = "inverted_index";
+
+        var indexRepository = new MongoInvertedIndexRepository(mongoClient,database,collection_index);
+        var metadataRepository = new MongoMetadataRepository(mongoClient,database,collection_metadata);
+        var gutenbergHeaderSerializer = new GutenbergHeaderSerializer();
+        return new IndexService(indexRepository, metadataRepository,gutenbergHeaderSerializer);
     }
 }
