@@ -30,6 +30,18 @@ public class IndexingApiAcceptanceTest {
         assertEquals("{\"book_id\":\"1\",\"index\":\"updated\"}", response.body());
     }
 
+
+    @Test
+    void rebuild_index_for_book() throws IOException, InterruptedException {
+        var indexUpdateCall = CreateHttpPostCall("http://localhost:8080/index/rebuild");
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(indexUpdateCall, HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, response.statusCode());
+        assertEquals("{\"book_id\":\"1\",\"index\":\"updated\"}", response.body());
+    }
+
     private HttpRequest CreateHttpPostCall(String url) {
         return HttpRequest.newBuilder()
                 .uri(URI.create(url))

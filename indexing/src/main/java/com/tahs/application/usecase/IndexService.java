@@ -1,19 +1,18 @@
 package com.tahs.application.usecase;
 
+import com.tahs.domain.Book;
 import com.tahs.domain.BookSection;
 import com.tahs.application.ports.InvertedIndexRepository;
 import com.tahs.application.ports.MetadataRepository;
+import com.tahs.application.dto.StatsDto;
 import com.tahs.infrastructure.serialization.books.GutenbergHeaderSerializer;
 import com.tahs.infrastructure.serialization.books.TextTokenizer;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.text.Normalizer;
 import java.util.List;
-import java.util.Locale;
 import java.util.stream.Stream;
 
 public class IndexService {
@@ -32,6 +31,46 @@ public class IndexService {
     public void updateByBookId(String bookId) throws IOException {
         updateMetadata(bookId);
         updateIndexWords(bookId);
+    }
+
+    public void rebuildIndex() throws IOException {
+        indexRepository.deleteAll();
+        metadataRepository.deleteAll();
+        Path cwd = Path.of("").toAbsolutePath().normalize();  // 👈 This is the current working directory
+        Path parent = cwd.getParent() != null ? cwd.getParent() : cwd;
+        List<Path> roots = List.of(
+                cwd.resolve("datalake")
+        );
+        for (Path root : roots) {
+            if (!Files.exists(root)) continue;
+            try (Stream<Path> stream = Files.find(
+                    root,
+                    3,
+                    (p, attrs) -> attrs.isRegularFile()
+                            && p.getFileName().toString().endsWith(".txt")
+            )){
+                stream.forEach(pathTxt -> {
+                    try {
+                        if (!Files.exists(pathTxt) &&
+                                !Files.exists(Path.of(pathTxt.toString().replace("header", "body")))){
+                            throw new NoSuchFileException("Not found header and body" + pathTxt.toString() + " in datalake");
+                        }
+                        var bookId = pathTxt.getFileName().toString().split("\\.")[0];
+                        if (pathTxt.getFileName().toString().contains("header")){
+                            var bookHeader = this.gutenbergHeaderSerializer.deserialize(pathTxt.toString());
+                            metadataRepository.save(bookHeader);
+                        }
+                        if (pathTxt.getFileName().toString().contains("body")){
+                            var text = this.gutenbergHeaderSerializer.readFile(pathTxt.toString());
+                            var terms = TextTokenizer.extractTerms(text);
+                            indexRepository.indexBook(bookId,terms);
+                        }
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+            }
+        }
     }
 
     private void updateIndexWords(String bookId) throws IOException {
@@ -57,8 +96,7 @@ public class IndexService {
         Path parent = cwd.getParent() != null ? cwd.getParent() : cwd;
 
         List<Path> roots = List.of(
-                cwd.resolve("datalake"),
-                parent.resolve("datalake")
+                cwd.resolve("datalake")
         );
 
         for (Path root : roots) {
@@ -81,4 +119,16 @@ public class IndexService {
         throw new IllegalStateException(new NoSuchFileException("Not found " + fileName + " in datalake"));
     }
 
+    public List<Book> getAllBooks() {
+        return metadataRepository.getAll();
+    }
+
+    public StatsDto getStats() {
+        var indexStats = indexRepository.getStats();
+        return new StatsDto(
+                metadataRepository.getAll().size(),
+                indexStats.sizeMB(),
+                indexStats.lastUpdate()
+        );
+    }
 }
