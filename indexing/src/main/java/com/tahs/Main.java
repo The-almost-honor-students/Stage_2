@@ -37,12 +37,7 @@ public class Main {
 
         app.get("/index/status", ctx -> {
             var stats = indexService.getStats();
-            Map<String, Object> status = Map.of(
-                    "books_indexed", stats.books_indexed(),
-                    "last_update", stats.lastUpdate(),
-                    "index_size_MB", stats.sizeMB()
-            );
-            ctx.result(gson.toJson(status));
+            ctx.result(gson.toJson(stats));
         });
 
         app.post("/index/update/{book_id}", ctx -> {
