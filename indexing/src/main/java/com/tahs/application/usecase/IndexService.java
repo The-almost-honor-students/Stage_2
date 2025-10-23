@@ -45,7 +45,7 @@ public class IndexService {
     public void rebuildIndex() throws IOException {
         indexRepository.deleteAll();
         metadataRepository.deleteAll();
-        Path cwd = Path.of("").toAbsolutePath().normalize();  // 👈 This is the current working directory
+        Path cwd = Path.of("").toAbsolutePath().normalize();
         Path parent = cwd.getParent() != null ? cwd.getParent() : cwd;
         List<Path> roots = List.of(
                 cwd.resolve("datalake")
@@ -113,7 +113,7 @@ public class IndexService {
 
             try (Stream<Path> stream = Files.find(
                     root,
-                    3, // datalake/YYYYMMDD/HH/archivo
+                    3,
                     (p, attrs) -> attrs.isRegularFile() && p.getFileName().toString().equals(fileName))) {
 
                 var found = stream.findFirst();
