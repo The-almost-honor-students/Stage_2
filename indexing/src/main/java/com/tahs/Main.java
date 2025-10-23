@@ -5,6 +5,7 @@ import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializer;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
+import com.tahs.application.exceptions.BookNotFound;
 import com.tahs.application.usecase.IndexService;
 import com.tahs.infrastructure.persistence.MongoInvertedIndexRepository;
 import com.tahs.infrastructure.persistence.MongoMetadataRepository;
@@ -49,6 +50,37 @@ public class Main {
                     "index", "updated"
             );
             ctx.result(gson.toJson(response));
+        });
+
+        app.post("/index/update/{book_id}", ctx -> {
+            String bookId = ctx.pathParam("book_id");
+            System.out.println("Indexing book " + bookId + "...");
+
+            try {
+                indexService.updateByBookId(bookId);
+                Map<String, Object> response = Map.of(
+                        "book_id", bookId,
+                        "index", "updated"
+                );
+                ctx.status(200).result(gson.toJson(response));
+            }
+            catch (BookNotFound e) {
+                ctx.status(404);
+                Map<String, Object> error = Map.of(
+                        "book_id", bookId,
+                        "error", "Book not found",
+                        "message", e.getMessage()
+                );
+                ctx.result(gson.toJson(error));
+            }
+            catch (Exception e) {
+                ctx.status(500);
+                Map<String, Object> errorResponse = Map.of(
+                        "error", "Error interno al actualizar el índice",
+                        "details", e.getMessage()
+                );
+                ctx.result(gson.toJson(errorResponse));
+            }
         });
 
         app.post("/index/rebuild", ctx -> {

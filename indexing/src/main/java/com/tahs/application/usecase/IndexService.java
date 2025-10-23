@@ -1,5 +1,6 @@
 package com.tahs.application.usecase;
 
+import com.tahs.application.exceptions.BookNotFound;
 import com.tahs.domain.Book;
 import com.tahs.domain.BookSection;
 import com.tahs.application.ports.InvertedIndexRepository;
@@ -28,9 +29,17 @@ public class IndexService {
         this.gutenbergHeaderSerializer = gutenbergHeaderSerializer;
     }
 
-    public void updateByBookId(String bookId) throws IOException {
-        updateMetadata(bookId);
-        updateIndexWords(bookId);
+    public void updateByBookId(String bookId) throws BookNotFound {
+        try {
+            updateMetadata(bookId);
+        } catch (BookNotFound | IOException e) {
+            throw new RuntimeException(e);
+        }
+        try {
+            updateIndexWords(bookId);
+        } catch (BookNotFound | IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public void rebuildIndex() throws IOException {
