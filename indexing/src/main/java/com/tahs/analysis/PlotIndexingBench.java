@@ -18,10 +18,14 @@ import java.util.stream.Collectors;
 
 public class PlotIndexingBench {
 
+    private static final String BENCH_NAME = "indexing";  // <-- Change this to reuse the script for another benchmark
+
     public static void main(String[] args) throws Exception {
-        Path csvPath = Path.of(args.length > 0 ? args[0] : "benchmarking_results/indexing_data.csv");
-        Path outDir  = Path.of("benchmarking_results/indexing/plots");
-        Path sumDir  = Path.of("benchmarking_results/indexing/data");
+        Path baseDir = Path.of("benchmarking_results").resolve(BENCH_NAME);
+        Path csvPath = Path.of(args.length > 0 ? args[0] : "benchmarking_results/" + BENCH_NAME + "_data.csv");
+        Path outDir  = baseDir.resolve("plots");
+        Path sumDir  = baseDir.resolve("data");
+
         Files.createDirectories(outDir);
         Files.createDirectories(sumDir);
 
@@ -31,30 +35,30 @@ public class PlotIndexingBench {
 
         if (!thrpt.isEmpty()) {
             Map<Integer, Stats> thrByThreads = groupStatsByThreads(thrpt);
-            plotThroughputVsThreads(thrByThreads, outDir.resolve("throughput_vs_threads.png"));
-            writeSummary(thrByThreads, sumDir.resolve("summary_throughput.csv"), "threads,mean_ops_s,std_ops_s\n");
+            plotThroughputVsThreads(thrByThreads, outDir.resolve(BENCH_NAME + "_throughput_vs_threads.png"));
+            writeSummary(thrByThreads, sumDir.resolve(BENCH_NAME + "_summary_throughput.csv"), "threads,mean_ops_s,std_ops_s\n");
         }
 
         if (!latency.isEmpty()) {
             double[] valuesSec = latency.stream().mapToDouble(r -> r.scoreSecPerOp).toArray();
-            plotLatencyHistogram(valuesSec, outDir.resolve("latency_histogram.png"));
-            writeSummaryLatency(valuesSec, sumDir.resolve("summary_latency.csv"));
+            plotLatencyHistogram(valuesSec, outDir.resolve(BENCH_NAME + "_latency_histogram.png"));
+            writeSummaryLatency(valuesSec, sumDir.resolve(BENCH_NAME + "_summary_latency.csv"));
         }
 
         System.out.println("Plots:");
-        System.out.println(" - " + outDir.resolve("throughput_vs_threads.png"));
-        System.out.println(" - " + outDir.resolve("latency_histogram.png"));
+        System.out.println(" - " + outDir.resolve(BENCH_NAME + "_throughput_vs_threads.png"));
+        System.out.println(" - " + outDir.resolve(BENCH_NAME + "_latency_histogram.png"));
         System.out.println("Summaries:");
-        System.out.println(" - " + sumDir.resolve("summary_throughput.csv"));
-        System.out.println(" - " + sumDir.resolve("summary_latency.csv"));
+        System.out.println(" - " + sumDir.resolve(BENCH_NAME + "_summary_throughput.csv"));
+        System.out.println(" - " + sumDir.resolve(BENCH_NAME + "_summary_latency.csv"));
     }
 
     static final class Row {
         final String benchmark;
         final String mode;
         final int threads;
-        final double scoreSecPerOp;   // for avgt (seconds/op)
-        final double scoreOpsPerSec;  // for thrpt (ops/s)
+        final double scoreSecPerOp;
+        final double scoreOpsPerSec;
         Row(String b, String m, int t, double sSec, double sOps) {
             this.benchmark=b; this.mode=m; this.threads=t; this.scoreSecPerOp=sSec; this.scoreOpsPerSec=sOps;
         }
@@ -79,7 +83,7 @@ public class PlotIndexingBench {
                 if (mode.toLowerCase(Locale.ROOT).contains("avgt")) {
                     secPerOp = toSecondsPerOp(score, units);
                 } else if (mode.toLowerCase(Locale.ROOT).contains("thrpt")) {
-                    opsPerSec = score; // JMH thrpt is already ops/s
+                    opsPerSec = score;
                 }
                 out.add(new Row(benchmark, mode.toLowerCase(Locale.ROOT), threads, secPerOp, opsPerSec));
             }
