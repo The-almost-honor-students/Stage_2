@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 
 public class PlotIndexingBench {
 
-    private static final String BENCH_NAME = "indexing";  // <-- Change this to reuse the script for another benchmark
+    private static final String BENCH_NAME = "indexing";
 
     public static void main(String[] args) throws Exception {
         Path baseDir = Path.of("benchmarking_results").resolve(BENCH_NAME);

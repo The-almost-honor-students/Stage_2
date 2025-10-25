@@ -12,15 +12,14 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Warmup(iterations = 5)
@@ -113,8 +112,11 @@ public class IndexingBenchmarks {
     }
 
     private void indexBookInMemory(String id, Set<String> terms) {
-        for (String term : terms)
-            invertedIndex.computeIfAbsent(term, k -> Collections.newSetFromMap(new ConcurrentHashMap<>())).add(id);
+        for (String term : terms) {
+            invertedIndex
+                    .computeIfAbsent(term, k -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
+                    .add(id);
+        }
     }
 
     private String findInDatalake(String id, String section) {
@@ -133,16 +135,50 @@ public class IndexingBenchmarks {
             org.openjdk.jmh.Main.main(args);
             return;
         }
-        Files.createDirectories(Path.of("results"));
-        Options opt = new OptionsBuilder()
-                .include(IndexingBenchmarks.class.getSimpleName())
-                .warmupIterations(5)
-                .measurementIterations(10)
-                .forks(1)
-                .timeUnit(TimeUnit.SECONDS)
-                .result("benchmarking_results/indexing/data/indexing_data.csv")
-                .resultFormat(ResultFormatType.CSV)
-                .build();
-        new Runner(opt).run();
+
+        Path base = Path.of("benchmarking_results").resolve("indexing").resolve("data");
+        Files.createDirectories(base);
+        Path merged = base.resolve("indexing_data.csv");
+
+        int[] threadSweep = {1, 2, 4, 8};
+        List<Path> partials = new ArrayList<>();
+
+        for (int t : threadSweep) {
+            Path out = base.resolve("jmh_t" + t + ".csv");
+            Options opt = new OptionsBuilder()
+                    .include(IndexingBenchmarks.class.getSimpleName())
+                    .warmupIterations(5)
+                    .measurementIterations(10)
+                    .forks(1)
+                    .timeUnit(TimeUnit.SECONDS)
+                    .threads(t)
+                    .result(out.toString())
+                    .resultFormat(ResultFormatType.CSV)
+                    .build();
+            new Runner(opt).run();
+            partials.add(out);
+        }
+
+        mergeCsv(partials, merged);
+        for (Path p : partials) {
+            try { Files.deleteIfExists(p); } catch (Exception ignored) {}
+        }
+        System.out.println("CSV merged: " + merged.toAbsolutePath());
+    }
+
+    private static void mergeCsv(List<Path> inputs, Path output) throws IOException {
+        if (inputs.isEmpty()) throw new IOException("No CSV inputs to merge");
+        List<String> header = Files.readAllLines(inputs.get(0), StandardCharsets.UTF_8);
+        if (header.isEmpty()) throw new IOException("First CSV has no header: " + inputs.get(0));
+
+        List<String> out = new ArrayList<>();
+        out.add(header.get(0)); // header
+        for (Path in : inputs) {
+            List<String> lines = Files.readAllLines(in, StandardCharsets.UTF_8);
+            for (int i = 1; i < lines.size(); i++) {
+                out.add(lines.get(i));
+            }
+        }
+        Files.write(output, out, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 }
