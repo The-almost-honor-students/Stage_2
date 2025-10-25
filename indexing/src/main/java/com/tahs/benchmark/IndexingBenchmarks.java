@@ -140,7 +140,7 @@ public class IndexingBenchmarks {
                 .measurementIterations(10)
                 .forks(1)
                 .timeUnit(TimeUnit.SECONDS)
-                .result("benchmarking_results/indexing_data.csv")
+                .result("benchmarking_results/indexing/data/indexing_data.csv")
                 .resultFormat(ResultFormatType.CSV)
                 .build();
         new Runner(opt).run();
