@@ -41,4 +41,108 @@ public class IndexingBenchmarks {
     private GutenbergHeaderSerializer headerSerializer;
     private AtomicInteger rr;
 
+    @Setup(Level.Trial)
+    public void setup() {
+        invertedIndex = new ConcurrentHashMap<>(1 << 14);
+        metadataRepo = new ConcurrentHashMap<>();
+        headerSerializer = new GutenbergHeaderSerializer();
+        rr = new AtomicInteger(0);
+        Path root = Path.of(datalakeDir).toAbsolutePath().normalize();
+        if (!Files.exists(root)) throw new IllegalStateException("Datalake directory not found: " + root);
+        availableIds = discoverIdsWithHeaderAndBody(root);
+        if (availableIds.isEmpty()) throw new IllegalStateException("No valid <id>.header.txt + <id>.body.txt pairs found in: " + root);
+        if (!availableIds.contains(bookId)) bookId = availableIds.get(0);
+    }
+
+    @TearDown(Level.Iteration)
+    public void clearBetweenIterations() {
+        invertedIndex.clear();
+        metadataRepo.clear();
+        rr.set(0);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void indexLatency_perBook(Blackhole bh) throws IOException {
+        String headerPath = findInDatalake(bookId, "header");
+        Book book = headerSerializer.deserialize(headerPath);
+        metadataRepo.put(bookId, book);
+        String bodyPath = findInDatalake(bookId, "body");
+        String text = headerSerializer.readFile(bodyPath);
+        Set<String> terms = TextTokenizer.extractTerms(text);
+        indexBookInMemory(bookId, terms);
+        bh.consume(invertedIndex.size());
+        bh.consume(invertedIndex.getOrDefault("indexing", Set.of()).size());
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.Throughput)
+    public void throughputIndexing_roundRobin(Blackhole bh) throws IOException {
+        String id = nextId();
+        String headerPath = findInDatalake(id, "header");
+        Book book = headerSerializer.deserialize(headerPath);
+        metadataRepo.put(id, book);
+        String bodyPath = findInDatalake(id, "body");
+        String text = headerSerializer.readFile(bodyPath);
+        Set<String> terms = TextTokenizer.extractTerms(text);
+        indexBookInMemory(id, terms);
+        bh.consume(book.getAuthor());
+        bh.consume(invertedIndex.getOrDefault("indexing", Set.of()).size());
+    }
+
+    private List<String> discoverIdsWithHeaderAndBody(Path root) {
+        try (Stream<Path> s = Files.find(root, 5, (p, a) -> a.isRegularFile() && p.getFileName().toString().endsWith(".txt"))) {
+            Map<String, Set<String>> filesById = new HashMap<>();
+            s.forEach(p -> {
+                String[] parts = p.getFileName().toString().split("\\.");
+                if (parts.length >= 3) filesById.computeIfAbsent(parts[0], k -> new HashSet<>()).add(parts[1]);
+            });
+            return filesById.entrySet().stream()
+                    .filter(e -> e.getValue().contains("header") && e.getValue().contains("body"))
+                    .map(Map.Entry::getKey)
+                    .sorted()
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private String nextId() {
+        int idx = Math.floorMod(rr.getAndIncrement(), availableIds.size());
+        return availableIds.get(idx);
+    }
+
+    private void indexBookInMemory(String id, Set<String> terms) {
+        for (String term : terms)
+            invertedIndex.computeIfAbsent(term, k -> Collections.newSetFromMap(new ConcurrentHashMap<>())).add(id);
+    }
+
+    private String findInDatalake(String id, String section) {
+        String fileName = id + "." + section + ".txt";
+        Path root = Path.of(datalakeDir).toAbsolutePath().normalize();
+        try (Stream<Path> s = Files.find(root, 5, (p, attrs) -> attrs.isRegularFile() && p.getFileName().toString().equals(fileName))) {
+            return s.findFirst().map(Path::toString)
+                    .orElseThrow(() -> new IllegalStateException("File not found: " + fileName + " in " + root));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        if (args != null && args.length > 0) {
+            org.openjdk.jmh.Main.main(args);
+            return;
+        }
+        Files.createDirectories(Path.of("results"));
+        Options opt = new OptionsBuilder()
+                .include(IndexingBenchmarks.class.getSimpleName())
+                .warmupIterations(5)
+                .measurementIterations(10)
+                .forks(1)
+                .timeUnit(TimeUnit.SECONDS)
+                .result("benchmarking_results/indexing_data.csv")
+                .resultFormat(ResultFormatType.CSV)
+                .build();
+        new Runner(opt).run();
+    }
 }
