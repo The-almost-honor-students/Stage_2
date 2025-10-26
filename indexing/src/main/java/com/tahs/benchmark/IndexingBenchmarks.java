@@ -11,10 +11,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
@@ -163,10 +160,20 @@ public class IndexingBenchmarks {
                     .timeUnit(TimeUnit.SECONDS)
                     .result(aggCsv.toString())
                     .resultFormat(ResultFormatType.CSV)
-                    .output(rawLog.toString())
                     .build();
 
-            Collection<RunResult> _ignore = new Runner(opt).run();
+            PrintStream originalOut = System.out;
+            try (FileOutputStream fos = new FileOutputStream(rawLog.toFile());
+                 PrintStream fileOut = new PrintStream(fos, true, StandardCharsets.UTF_8);
+                 PrintStream dual = new PrintStream(new DualOutputStream(originalOut, fileOut), true, StandardCharsets.UTF_8)) {
+
+                System.setOut(dual);
+                System.out.printf("%n=== Running %s benchmark with %d threads ===%n", BENCH, t);
+                Collection<RunResult> _ignore = new Runner(opt).run();
+                System.out.printf("=== Finished %s benchmark with %d threads ===%n", BENCH, t);
+            } finally {
+                System.setOut(originalOut);
+            }
 
             writeIterCsvHeader(iterCsv);
             parseRawToIterationsCsv(rawLog, iterCsv, t);
@@ -179,8 +186,17 @@ public class IndexingBenchmarks {
         for (Path p : partialAgg) { try { Files.deleteIfExists(p); } catch (Exception ignored) {} }
 
         System.out.println("Aggregated CSV: " + mergedAgg.toAbsolutePath());
-        System.out.println("Per-thread iteration CSVs: " + base.toAbsolutePath());
+        System.out.println("Per-thread iteration CSVs folder: " + base.toAbsolutePath());
         System.out.println("Merged iterations CSV: " + mergedIters.toAbsolutePath());
+    }
+
+    private static final class DualOutputStream extends OutputStream {
+        private final PrintStream a, b;
+        DualOutputStream(PrintStream a, PrintStream b) { this.a = a; this.b = b; }
+        @Override public void write(int i) { a.write(i); b.write(i); }
+        @Override public void write(byte[] buf, int off, int len) { a.write(buf, off, len); b.write(buf, off, len); }
+        @Override public void flush() { a.flush(); b.flush(); }
+        @Override public void close() { a.flush(); b.flush(); }
     }
 
     private static void writeIterCsvHeader(Path csv) throws IOException {
