@@ -1,124 +1,118 @@
 package com.tahs.application.usecase;
 
-import io.javalin.http.Context;
+import com.tahs.application.ports.DatalakeRepository;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.net.http.*;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 public class IngestionService {
 
-    private static final String DATALAKE_PATH = "datalake";
     private static final String START_MARKER = "*** START OF THE PROJECT GUTENBERG EBOOK";
     private static final String END_MARKER = "*** END OF THE PROJECT GUTENBERG EBOOK";
 
-    public static boolean downloadBook(int bookId, String outputPath) {
-        try {
-            Path outputDir = Paths.get(outputPath);
-            if (Files.notExists(outputDir)) {
-                Files.createDirectories(outputDir);
-            }
+    private final DatalakeRepository datalakeRepo;
+    private final Path stagingDir;
+    private final int totalBooks;
+    private final int maxRetries;
+    private final Random rng = new Random();
 
+    public IngestionService(DatalakeRepository datalakeRepo,
+                            Path stagingDir,
+                            int totalBooks,
+                            int maxRetries) {
+        this.datalakeRepo = datalakeRepo;
+        this.stagingDir = stagingDir.toAbsolutePath().normalize();
+        this.totalBooks = totalBooks;
+        this.maxRetries = maxRetries;
+    }
+
+    public boolean downloadBookToStaging(int bookId) {
+        try {
+            Files.createDirectories(stagingDir);
             String url = String.format("https://www.gutenberg.org/cache/epub/%d/pg%d.txt", bookId, bookId);
             HttpClient client = HttpClient.newHttpClient();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .build();
+            HttpRequest req = HttpRequest.newBuilder().uri(URI.create(url)).build();
+            HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
 
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() != 200) {
-                System.out.println("[ERROR] HTTP " + response.statusCode() + " when downloading book " + bookId);
+            if (res.statusCode() != 200) {
+                System.err.println("[ERROR] HTTP " + res.statusCode() + " when downloading book " + bookId);
                 return false;
             }
 
-            String text = response.body();
-            if (!text.contains(START_MARKER) || !text.contains(END_MARKER)) {
-                System.out.println("[WARN] Start/End markers not found in book " + bookId);
+            String txt = res.body();
+            if (!txt.contains(START_MARKER) || !txt.contains(END_MARKER)) {
+                System.err.println("[WARN] Missing markers for book " + bookId);
                 return false;
             }
 
-            String[] parts = text.split(Pattern.quote(START_MARKER), 2);
+            String[] parts = txt.split(Pattern.quote(START_MARKER), 2);
             String header = parts[0].trim();
             String[] bodyParts = parts[1].split(Pattern.quote(END_MARKER), 2);
             String body = bodyParts[0].trim();
 
-            Path bodyPath = outputDir.resolve(bookId + "_body.txt");
-            Path headerPath = outputDir.resolve(bookId + "_header.txt");
+            Files.writeString(stagingDir.resolve(bookId + "_header.txt"), header, StandardCharsets.UTF_8);
+            Files.writeString(stagingDir.resolve(bookId + "_body.txt"), body, StandardCharsets.UTF_8);
 
-            Files.writeString(bodyPath, body, StandardCharsets.UTF_8);
-            Files.writeString(headerPath, header, StandardCharsets.UTF_8);
-
-            System.out.println("[INFO] Book " + bookId + " downloaded to " + outputDir.toAbsolutePath());
+            System.out.println("[INFO] Book " + bookId + " downloaded to staging at " + stagingDir);
             return true;
 
         } catch (IOException | InterruptedException e) {
-            System.out.println("[ERROR] Download failed for book " + bookId + ": " + e.getMessage());
+            System.err.println("[ERROR] Download failed for book " + bookId + ": " + e.getMessage());
             return false;
         }
     }
 
-    public static void listBooks(Context ctx) {
+    public boolean moveToDatalake(int bookId, LocalDateTime ts) {
         try {
-            List<Integer> books = Files.walk(Paths.get(DATALAKE_PATH))
-                    .filter(Files::isRegularFile)
-                    .map(p -> p.getFileName().toString())
-                    .filter(name -> name.endsWith(".body.txt"))
-                    .map(name -> name.split("\\.")[0])
-                    .map(Integer::parseInt)
-                    .sorted()
-                    .collect(Collectors.toList());
-
-            ctx.json(Map.of(
-                    "count", books.size(),
-                    "books", books
-            ));
-        } catch (IOException e) {
-            ctx.status(500).json(Map.of("error", e.getMessage()));
-        }
-    }
-
-    public static boolean createDatalake(int bookId, String downloadPath) {
-        try {
-            String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-            String hour = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH"));
-
-            Path datalakeDir = Paths.get("../datalake", date, hour);
-            Files.createDirectories(datalakeDir);
-
-            Path downloadsDir = Paths.get(downloadPath);
-            Path bodySrc = downloadsDir.resolve(bookId + "_body.txt");
-            Path headerSrc = downloadsDir.resolve(bookId + "_header.txt");
-
-            if (!Files.exists(bodySrc) || !Files.exists(headerSrc)) {
-                System.out.println("[ERROR] Files not found in " + downloadsDir.toAbsolutePath());
-                return false;
-            }
-
-            Path bodyDst = datalakeDir.resolve(bookId + ".body.txt");
-            Path headerDst = datalakeDir.resolve(bookId + ".header.txt");
-
-            Files.move(bodySrc, bodyDst, StandardCopyOption.REPLACE_EXISTING);
-            Files.move(headerSrc, headerDst, StandardCopyOption.REPLACE_EXISTING);
-
-            System.out.println("[INFO] Files moved to datalake at " + datalakeDir.toAbsolutePath());
+            datalakeRepo.saveBook(bookId, stagingDir, ts);
             return true;
-
         } catch (IOException e) {
-            System.out.println("[ERROR] Failed to move files to datalake: " + e.getMessage());
+            System.err.println("[ERROR] Failed to move book " + bookId + " to datalake: " + e.getMessage());
             return false;
+        }
+    }
+
+    public boolean ingestOne(int bookId, LocalDateTime ts) {
+        if (!downloadBookToStaging(bookId)) return false;
+        return moveToDatalake(bookId, ts);
+    }
+
+    public boolean ingestNextRandom(Set<Integer> alreadyDownloaded, LocalDateTime ts) {
+        for (int i = 0; i < maxRetries; i++) {
+            int candidate = rng.nextInt(totalBooks) + 1;
+            if (alreadyDownloaded.contains(candidate)) continue;
+            if (ingestOne(candidate, ts)) return true;
+        }
+        return false;
+    }
+
+    public boolean existsInDatalake(int bookId) {
+        try {
+            return datalakeRepo.exists(bookId);
+        } catch (IOException e) {
+            System.err.println("[ERROR] Could not check existence for book " + bookId + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    public String relativePathFor(int bookId, LocalDateTime ts) {
+        return datalakeRepo.relativePathFor(bookId, ts);
+    }
+
+    public List<Integer> listBooks() {
+        try {
+            return datalakeRepo.listBooks();
+        } catch (IOException e) {
+            System.err.println("[ERROR] Could not list books: " + e.getMessage());
+            return List.of();
         }
     }
 }
