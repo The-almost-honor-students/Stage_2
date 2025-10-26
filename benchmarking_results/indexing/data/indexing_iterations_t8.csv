@@ -1,0 +1,31 @@
+threads,phase,iteration,value,unit,mode,benchmark
+8,warmup,1,723115.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,warmup,2,769468.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,warmup,3,757518.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,warmup,4,725800.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,warmup,5,712816.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,iteration,1,768350.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,iteration,2,735653.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,iteration,3,701668.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,iteration,4,770035.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,iteration,5,770393.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,iteration,6,768421.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,iteration,7,772025.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,iteration,8,771853.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,iteration,9,766443.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,iteration,10,763603.000000000,ops/s,thrpt,com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+8,warmup,1,9.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,warmup,2,8.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,warmup,3,9.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,warmup,4,9.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,warmup,5,8.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,iteration,1,9.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,iteration,2,8.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,iteration,3,8.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,iteration,4,8.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,iteration,5,9.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,iteration,6,8.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,iteration,7,10.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,iteration,8,10.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,iteration,9,9.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+8,iteration,10,9.000000000,±(99.9%) 0,001 s/op,avgt,com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
