@@ -1,0 +1,98 @@
+
+=== Running indexing benchmark with 2 threads ===
+# JMH version: 1.37
+# VM version: JDK 23, OpenJDK 64-Bit Server VM, 23+37-2369
+# VM invoker: /Users/giselabelmontecruz/Library/Java/JavaVirtualMachines/openjdk-23/Contents/Home/bin/java
+# VM options: -javaagent:/Applications/IntelliJ IDEA.app/Contents/lib/idea_rt.jar=49498:/Applications/IntelliJ IDEA.app/Contents/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 10 s each
+# Measurement: 10 iterations, 10 s each
+# Timeout: 10 min per iteration
+# Threads: 2 threads, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin
+# Parameters: (bookId = 1342, datalakeDir = datalake)
+
+# Run progress: 0,00% complete, ETA 00:05:00
+# Fork: 1 of 1
+# Warmup Iteration   1: 349,985 ops/s
+# Warmup Iteration   2: 331,548 ops/s
+# Warmup Iteration   3: 225,745 ops/s
+# Warmup Iteration   4: 370,842 ops/s
+# Warmup Iteration   5: 369,679 ops/s
+Iteration   1: 370,385 ops/s
+Iteration   2: 371,195 ops/s
+Iteration   3: 370,891 ops/s
+Iteration   4: 370,836 ops/s
+Iteration   5: 371,296 ops/s
+Iteration   6: 371,494 ops/s
+Iteration   7: 371,011 ops/s
+Iteration   8: 370,923 ops/s
+Iteration   9: 370,905 ops/s
+Iteration  10: 371,146 ops/s
+
+
+Result "com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin":
+  371,008 ±(99.9%) 0,457 ops/s [Average]
+  (min, avg, max) = (370,385, 371,008, 371,494), stdev = 0,302
+  CI (99.9%): [370,552, 371,465] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 23, OpenJDK 64-Bit Server VM, 23+37-2369
+# VM invoker: /Users/giselabelmontecruz/Library/Java/JavaVirtualMachines/openjdk-23/Contents/Home/bin/java
+# VM options: -javaagent:/Applications/IntelliJ IDEA.app/Contents/lib/idea_rt.jar=49498:/Applications/IntelliJ IDEA.app/Contents/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 10 s each
+# Measurement: 10 iterations, 10 s each
+# Timeout: 10 min per iteration
+# Threads: 2 threads, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook
+# Parameters: (bookId = 1342, datalakeDir = datalake)
+
+# Run progress: 50,00% complete, ETA 00:02:30
+# Fork: 1 of 1
+# Warmup Iteration   1: 0,004 s/op
+# Warmup Iteration   2: 0,004 s/op
+# Warmup Iteration   3: 0,004 s/op
+# Warmup Iteration   4: 0,004 s/op
+# Warmup Iteration   5: 0,004 s/op
+Iteration   1: 0,004 s/op
+Iteration   2: 0,004 s/op
+Iteration   3: 0,004 s/op
+Iteration   4: 0,004 s/op
+Iteration   5: 0,004 s/op
+Iteration   6: 0,004 s/op
+Iteration   7: 0,004 s/op
+Iteration   8: 0,004 s/op
+Iteration   9: 0,004 s/op
+Iteration  10: 0,004 s/op
+
+
+Result "com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook":
+  0,004 ±(99.9%) 0,001 s/op [Average]
+  (min, avg, max) = (0,004, 0,004, 0,004), stdev = 0,001
+  CI (99.9%): [0,004, 0,004] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:05:01
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                         (bookId)  (datalakeDir)   Mode  Cnt    Score    Error  Units
+IndexingBenchmarks.throughputIndexing_roundRobin      1342       datalake  thrpt   10  371,008 ±  0,457  ops/s
+IndexingBenchmarks.indexLatency_perBook               1342       datalake   avgt   10    0,004 ±  0,001   s/op
+
+Benchmark result is saved to benchmarking_results/indexing/data/jmh_t2.csv
+=== Finished indexing benchmark with 2 threads ===

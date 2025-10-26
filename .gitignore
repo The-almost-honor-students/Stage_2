@@ -13,6 +13,7 @@ target/
 *.iml
 *.ipr
 .idea/*
+*.xml
 
 ### Eclipse ###
 .apt_generated
@@ -38,3 +39,5 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+../mongo_data/
