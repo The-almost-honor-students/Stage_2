@@ -21,8 +21,7 @@ import java.util.stream.Collectors;
 
 public class IngestionService {
 
-    private static final String STAGING_PATH = "../staging/downloads";
-    private static final String DATALAKE_PATH = "../datalake";
+    private static final String DATALAKE_PATH = "datalake";
     private static final String START_MARKER = "*** START OF THE PROJECT GUTENBERG EBOOK";
     private static final String END_MARKER = "*** END OF THE PROJECT GUTENBERG EBOOK";
 
@@ -68,22 +67,6 @@ public class IngestionService {
         } catch (IOException | InterruptedException e) {
             System.out.println("[ERROR] Download failed for book " + bookId + ": " + e.getMessage());
             return false;
-        }
-    }
-
-    public static void checkStatus(Context ctx) {
-        int bookId = Integer.parseInt(ctx.pathParam("book_id"));
-        try {
-            boolean exists = Files.walk(Paths.get(DATALAKE_PATH))
-                    .filter(Files::isRegularFile)
-                    .anyMatch(p -> p.getFileName().toString().startsWith(bookId + ".body.txt"));
-
-            ctx.json(Map.of(
-                    "book_id", bookId,
-                    "status", exists ? "available" : "not_found"
-            ));
-        } catch (IOException e) {
-            ctx.status(500).json(Map.of("error", e.getMessage()));
         }
     }
 
