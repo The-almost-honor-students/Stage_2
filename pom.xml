@@ -13,6 +13,6 @@
         <module>ingestion</module>
         <module>indexing</module>
         <module>search</module>
-        <module>Control</module>
+        <module>control</module>
     </modules>
 </project>
