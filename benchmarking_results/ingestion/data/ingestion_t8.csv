@@ -1,0 +1,2 @@
+"Benchmark","Mode","Threads","Samples","Score","Score Error (99,9%)","Unit","Param: bookIds","Param: datalakeDir","Param: maxRetries","Param: stagingDir","Param: totalBooks"
+"com.tahs.benchmark.IngestionBenchmarks.ingestThroughput_roundRobin","thrpt",8,10,"7,310994","0,602555","ops/s",1-500,datalake,10,staging/downloads,70000
