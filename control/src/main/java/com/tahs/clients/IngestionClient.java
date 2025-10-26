@@ -7,7 +7,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 public class IngestionClient {
-    private static final String INGESTION_ENDPOINT = "http://localhost:8080/ingest";
+    private static final String INGESTION_ENDPOINT = "http://localhost:7070/ingest";
     private final HttpClient httpClient;
 
     public IngestionClient(HttpClient httpClient) {

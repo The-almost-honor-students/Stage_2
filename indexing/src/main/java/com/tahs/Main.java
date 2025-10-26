@@ -44,17 +44,6 @@ public class Main {
         app.post("/index/update/{book_id}", ctx -> {
             String bookId = ctx.pathParam("book_id");
             System.out.println("Indexing book " + bookId + "...");
-            indexService.updateByBookId(bookId);
-            Map<String, Object> response = Map.of(
-                    "book_id", bookId,
-                    "index", "updated"
-            );
-            ctx.result(gson.toJson(response));
-        });
-
-        app.post("/index/update/{book_id}", ctx -> {
-            String bookId = ctx.pathParam("book_id");
-            System.out.println("Indexing book " + bookId + "...");
 
             try {
                 indexService.updateByBookId(bookId);

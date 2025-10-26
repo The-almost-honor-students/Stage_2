@@ -1,0 +1,312 @@
+
+=== Running ingestion benchmark with 1 threads ===
+# JMH version: 1.37
+# VM version: JDK 17.0.16, OpenJDK 64-Bit Server VM, 17.0.16+8-LTS
+# VM invoker: /Users/giselabelmontecruz/Library/Java/JavaVirtualMachines/ms-17.0.16/Contents/Home/bin/java
+# VM options: -javaagent:/Applications/IntelliJ IDEA.app/Contents/lib/idea_rt.jar=54615:/Applications/IntelliJ IDEA.app/Contents/bin -Dfile.encoding=UTF-8
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 10 s each
+# Measurement: 10 iterations, 10 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: com.tahs.benchmark.IngestionBenchmarks.ingestThroughput_roundRobin
+# Parameters: (bookIds = 1-500, datalakeDir = datalake, maxRetries = 10, stagingDir = staging/downloads, totalBooks = 70000)
+
+# Run progress: 0,00% complete, ETA 00:02:30
+Forking using command: [/Users/giselabelmontecruz/Library/Java/JavaVirtualMachines/ms-17.0.16/Contents/Home/bin/java, -javaagent:/Applications/IntelliJ IDEA.app/Contents/lib/idea_rt.jar=54615:/Applications/IntelliJ IDEA.app/Contents/bin, -Dfile.encoding=UTF-8, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/w2/rgt7_7yn72z1w7cpp78bw3100000gn/T/jmh16269490753484535532compilecommand, -cp, /Users/giselabelmontecruz/IdeaProjects/Stage_2/ingestion/target/classes:/Users/giselabelmontecruz/.m2/repository/io/javalin/javalin/6.7.0/javalin-6.7.0.jar:/Users/giselabelmontecruz/.m2/repository/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/jetty-server/11.0.25/jetty-server-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/jetty-http/11.0.25/jetty-http-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/jetty-util/11.0.25/jetty-util-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/jetty-io/11.0.25/jetty-io-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/toolchain/jetty-jakarta-servlet-api/5.0.2/jetty-jakarta-servlet-api-5.0.2.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/websocket/websocket-jetty-server/11.0.25/websocket-jetty-server-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/jetty-servlet/11.0.25/jetty-servlet-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/jetty-security/11.0.25/jetty-security-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/jetty-webapp/11.0.25/jetty-webapp-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/jetty-xml/11.0.25/jetty-xml-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/websocket/websocket-jetty-api/11.0.25/websocket-jetty-api-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/websocket/websocket-jetty-common/11.0.25/websocket-jetty-common-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/websocket/websocket-core-common/11.0.25/websocket-core-common-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/websocket/websocket-servlet/11.0.25/websocket-servlet-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/eclipse/jetty/websocket/websocket-core-server/11.0.25/websocket-core-server-11.0.25.jar:/Users/giselabelmontecruz/.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-jdk8/1.9.25/kotlin-stdlib-jdk8-1.9.25.jar:/Users/giselabelmontecruz/.m2/repository/org/jetbrains/kotlin/kotlin-stdlib/1.9.25/kotlin-stdlib-1.9.25.jar:/Users/giselabelmontecruz/.m2/repository/org/jetbrains/annotations/13.0/annotations-13.0.jar:/Users/giselabelmontecruz/.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-jdk7/1.9.25/kotlin-stdlib-jdk7-1.9.25.jar:/Users/giselabelmontecruz/.m2/repository/com/google/code/gson/gson/2.11.0/gson-2.11.0.jar:/Users/giselabelmontecruz/.m2/repository/com/google/errorprone/error_prone_annotations/2.27.0/error_prone_annotations-2.27.0.jar:/Users/giselabelmontecruz/.m2/repository/org/slf4j/slf4j-simple/2.0.9/slf4j-simple-2.0.9.jar:/Users/giselabelmontecruz/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.17.2/jackson-databind-2.17.2.jar:/Users/giselabelmontecruz/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.17.2/jackson-annotations-2.17.2.jar:/Users/giselabelmontecruz/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.17.2/jackson-core-2.17.2.jar:/Users/giselabelmontecruz/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar:/Users/giselabelmontecruz/.m2/repository/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar:/Users/giselabelmontecruz/.m2/repository/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar:/Users/giselabelmontecruz/.m2/repository/org/apache/commons/commons-csv/1.10.0/commons-csv-1.10.0.jar, org.openjdk.jmh.runner.ForkedMain, 127.0.0.1, 54617]
+# Fork: 1 of 1
+# Warmup Iteration   1: [INFO] Book 1 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 1 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 2 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 2 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 3 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 3 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 4 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 4 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 5 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 5 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 6 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 6 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 7 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 7 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 8 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 8 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 9 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 9 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 10 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 10 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 11 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 11 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 12 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 12 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+1,173 ops/s
+# Warmup Iteration   2: [INFO] Book 13 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 13 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 14 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 14 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 15 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 15 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 16 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 16 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 17 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 17 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 18 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 18 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 19 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 19 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 20 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 20 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+0,729 ops/s
+# Warmup Iteration   3: [INFO] Book 21 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 21 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 22 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 22 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 23 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 23 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 24 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 24 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 25 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 25 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 26 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 26 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 27 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 27 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 28 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 28 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 29 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 29 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+0,870 ops/s
+# Warmup Iteration   4: [INFO] Book 30 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 30 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 31 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 31 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 32 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 32 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 33 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 33 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 34 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 34 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 35 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 35 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 36 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 36 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 37 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 37 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+0,708 ops/s
+# Warmup Iteration   5: [INFO] Book 38 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 38 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 39 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 39 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 41 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 41 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 42 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 42 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 43 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 43 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 44 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 44 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 45 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 45 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 46 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 46 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 47 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 47 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+0,958 ops/s
+Iteration   1: [INFO] Book 48 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 48 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 49 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 49 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 51 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 51 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 53 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 53 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 54 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 54 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 55 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 55 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 56 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 56 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 57 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 57 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+0,981 ops/s
+Iteration   2: [INFO] Book 58 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 58 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 59 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 59 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 60 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 60 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 61 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 61 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 62 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 62 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 63 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 63 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 64 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 64 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 66 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 66 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 67 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 67 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+0,924 ops/s
+Iteration   3: [INFO] Book 68 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 68 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 69 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 69 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 70 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 70 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 71 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 71 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 72 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 72 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 73 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 73 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 74 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 74 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 75 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 75 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 76 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 76 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+0,865 ops/s
+Iteration   4: [INFO] Book 77 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 77 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 78 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 78 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 79 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 79 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 80 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 80 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 81 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 81 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 82 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 82 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 83 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 83 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 84 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 84 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+0,782 ops/s
+Iteration   5: [INFO] Book 85 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 85 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 86 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 86 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 87 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 87 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 88 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 88 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 89 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 89 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 90 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 90 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 91 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 91 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 92 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 92 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 93 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 93 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+0,819 ops/s
+Iteration   6: [INFO] Book 94 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 94 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 95 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 95 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 96 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 96 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 97 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 97 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 98 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 98 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 99 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 99 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 100 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 100 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+0,668 ops/s
+Iteration   7: [INFO] Book 101 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 101 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 102 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 102 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 103 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 103 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 104 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 104 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 105 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 105 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 106 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 106 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 107 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 107 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+0,673 ops/s
+Iteration   8: [INFO] Book 108 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 108 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 109 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 109 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 110 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 110 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 111 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 111 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 112 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 112 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 113 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 113 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 115 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 115 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+0,898 ops/s
+Iteration   9: [INFO] Book 117 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 117 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 118 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 118 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 119 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 119 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 120 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 120 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 121 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 121 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 122 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 122 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 123 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 123 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 124 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 124 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 125 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 125 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+0,847 ops/s
+Iteration  10: [INFO] Book 126 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 126 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 128 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 128 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 130 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 130 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 131 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 131 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 132 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 132 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 133 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 133 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/16
+[INFO] Book 134 downloaded to staging at /Users/giselabelmontecruz/IdeaProjects/Stage_2/staging/downloads
+[INFO] Book 134 moved to datalake at /Users/giselabelmontecruz/IdeaProjects/Stage_2/datalake/20251026/17
+0,896 ops/s
+
+
+Result "com.tahs.benchmark.IngestionBenchmarks.ingestThroughput_roundRobin":
+  0,835 ±(99.9%) 0,156 ops/s [Average]
+  (min, avg, max) = (0,668, 0,835, 0,981), stdev = 0,103
+  CI (99.9%): [0,680, 0,991] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:02:38
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                        (bookIds)  (datalakeDir)  (maxRetries)       (stagingDir)  (totalBooks)   Mode  Cnt  Score   Error  Units
+IngestionBenchmarks.ingestThroughput_roundRobin      1-500       datalake            10  staging/downloads         70000  thrpt   10  0,835 ± 0,156  ops/s
+
+Benchmark result is saved to benchmarking_results/ingestion/data/ingestion_t1.csv
+=== Finished ingestion benchmark with 1 threads ===
