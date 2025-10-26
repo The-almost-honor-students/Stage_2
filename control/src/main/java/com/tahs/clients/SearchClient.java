@@ -9,7 +9,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 
 public class SearchClient {
-    private static final String SEARCH_ENDPOINT = "http://localhost:8080/search";
+    private static final String SEARCH_ENDPOINT = "http://localhost:9090/search";
     private final HttpClient httpClient;
 
     public SearchClient(HttpClient httpClient) {
