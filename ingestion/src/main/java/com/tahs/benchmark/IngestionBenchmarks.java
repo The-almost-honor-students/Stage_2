@@ -10,6 +10,7 @@ import org.openjdk.jmh.results.format.ResultFormatType;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.openjdk.jmh.runner.options.VerboseMode;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -65,7 +66,7 @@ public class IngestionBenchmarks {
     }
 
     @Benchmark
-    @BenchmarkMode(Mode.Throughput) // -> ops/s (books/s)
+    @BenchmarkMode(Mode.Throughput) // books/s
     public void ingestThroughput_roundRobin(Blackhole bh) {
         int id = nextId();
         boolean ok = ingestion.ingestOne(id, LocalDateTime.now());
@@ -143,6 +144,7 @@ public class IngestionBenchmarks {
                     .measurementIterations(10)
                     .forks(1)
                     .threads(t)
+                    .verbosity(VerboseMode.EXTRA)
                     .timeUnit(TimeUnit.SECONDS)
                     .result(aggCsv.toString())
                     .resultFormat(ResultFormatType.CSV)
@@ -162,13 +164,26 @@ public class IngestionBenchmarks {
             }
 
             writeIterCsvHeader(iterCsv);
-            parseRawToIterationsCsv(rawLog, iterCsv, t);
-            appendCsvWithoutHeader(iterCsv, mergedIters);
+            int written = parseRawToIterationsCsv(rawLog, iterCsv, t);
 
-            partialAgg.add(aggCsv);
+            if (written <= 0) {
+                try { Files.deleteIfExists(iterCsv); } catch (IOException ignored) {}
+            } else {
+                appendCsvWithoutHeader(iterCsv, mergedIters);
+            }
+            if (fileHasMoreThanHeader(aggCsv)) {
+                partialAgg.add(aggCsv);
+            } else {
+                try { Files.deleteIfExists(aggCsv); } catch (IOException ignored) {}
+            }
         }
 
         mergeCsvWithHeader(partialAgg, mergedAgg);
+
+        if (!fileHasMoreThanHeader(mergedIters)) {
+            try { Files.deleteIfExists(mergedIters); } catch (IOException ignored) {}
+            System.out.println("No iteration data to merge. Removed: " + mergedIters.toAbsolutePath());
+        }
 
         System.out.println("Aggregated CSV: " + mergedAgg.toAbsolutePath());
         System.out.println("Merged iterations CSV: " + mergedIters.toAbsolutePath());
@@ -192,7 +207,18 @@ public class IngestionBenchmarks {
         }
     }
 
+    private static boolean fileHasMoreThanHeader(Path p) {
+        try {
+            if (!Files.exists(p)) return false;
+            long lines = Files.lines(p).limit(2).count();
+            return lines >= 2;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     private static void appendCsvWithoutHeader(Path src, Path dst) throws IOException {
+        if (!Files.exists(src)) return;
         try (BufferedReader br = Files.newBufferedReader(src, StandardCharsets.UTF_8);
              PrintWriter out = new PrintWriter(Files.newBufferedWriter(dst, StandardCharsets.UTF_8, StandardOpenOption.APPEND))) {
             String line;
@@ -204,14 +230,15 @@ public class IngestionBenchmarks {
         }
     }
 
-    private static void parseRawToIterationsCsv(Path rawLog, Path outCsv, int threads) throws IOException {
-        Pattern warmup = Pattern.compile("^#\\s*Warmup Iteration\\s+(\\d+):\\s+([0-9.,]+)\\s+(.+)$");
-        Pattern meas   = Pattern.compile("^Iteration\\s+(\\d+):\\s+([0-9.,]+)\\s+(.+)$");
-        Pattern bench  = Pattern.compile("^# Benchmark:\\s*(.+)$");
-        Pattern mode   = Pattern.compile("^# Mode:\\s*(.+)$");
+    private static int parseRawToIterationsCsv(Path rawLog, Path outCsv, int threads) throws IOException {
+        Pattern warmup = Pattern.compile("^#\\s*Warmup\\s+Iteration\\s+(\\d+)\\s*:\\s*([0-9.,]+)(?:\\s*[±+\\-–—]\\s*[0-9.,]+)?\\s*(\\S.*)$");
+        Pattern meas   = Pattern.compile("^Iteration\\s+(\\d+)\\s*:\\s*([0-9.,]+)(?:\\s*[±+\\-–—]\\s*[0-9.,]+)?\\s*(\\S.*)$");
+        Pattern bench  = Pattern.compile("^#\\s*Benchmark:\\s*(.+)$");
+        Pattern mode   = Pattern.compile("^#\\s*Mode:\\s*(.+)$");
 
         String currentBenchmark = "";
         String currentMode = "";
+        int written = 0;
 
         try (BufferedReader br = Files.newBufferedReader(rawLog, StandardCharsets.UTF_8);
              PrintWriter w = new PrintWriter(Files.newBufferedWriter(outCsv, StandardCharsets.UTF_8, StandardOpenOption.APPEND))) {
@@ -232,6 +259,7 @@ public class IngestionBenchmarks {
                     String resolvedMode = inferMode(unit, currentMode);
                     w.printf(Locale.US, "%d,%s,%d,%.9f,%s,%s,%s%n",
                             threads, "warmup", it, val, unit, resolvedMode, currentBenchmark);
+                    written++;
                     continue;
                 }
 
@@ -243,9 +271,11 @@ public class IngestionBenchmarks {
                     String resolvedMode = inferMode(unit, currentMode);
                     w.printf(Locale.US, "%d,%s,%d,%.9f,%s,%s,%s%n",
                             threads, "iteration", it, val, unit, resolvedMode, currentBenchmark);
+                    written++;
                 }
             }
         }
+        return written;
     }
 
     private static String inferMode(String unit, String modeFromHeader) {
@@ -260,12 +290,16 @@ public class IngestionBenchmarks {
     }
 
     private static void mergeCsvWithHeader(List<Path> inputs, Path output) throws IOException {
-        if (inputs.isEmpty()) return;
-        List<String> header = Files.readAllLines(inputs.get(0), StandardCharsets.UTF_8);
+        List<Path> usable = inputs.stream().filter(IngestionBenchmarks::fileHasMoreThanHeader).collect(Collectors.toList());
+        if (usable.isEmpty()) {
+            try { Files.deleteIfExists(output); } catch (IOException ignored) {}
+            return;
+        }
+        List<String> header = Files.readAllLines(usable.get(0), StandardCharsets.UTF_8);
         if (header.isEmpty()) return;
         List<String> out = new ArrayList<>();
         out.add(header.get(0));
-        for (Path in : inputs) {
+        for (Path in : usable) {
             List<String> lines = Files.readAllLines(in, StandardCharsets.UTF_8);
             for (int i = 1; i < lines.size(); i++) out.add(lines.get(i));
         }
