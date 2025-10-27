@@ -1,8 +1,6 @@
 package com.tahs.benchmark;
 
 import com.tahs.clients.IngestionClient;
-import com.tahs.clients.IndexingClient;
-import com.tahs.clients.SearchClient;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
