@@ -1,0 +1,2 @@
+avg_latency_ms,p50_latency_ms,p95_latency_ms,avg_cpu_percent,avg_used_memory_mb
+30615.125,30616.448,30618.073,0.02,13.95
