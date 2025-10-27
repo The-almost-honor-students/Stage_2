@@ -281,14 +281,14 @@ public class PlotIngestionBench {
             g.fillRoundRect(lx - 4, ly - fm.getAscent(), fm.stringWidth(label) + 8, fm.getHeight(), 6, 6);
             g.setColor(Color.BLACK);
             g.drawString(label, lx, ly);
-            g.setColor(new Color(0,102,204)); // volver al azul para la línea
+            g.setColor(new Color(0,102,204));
         }
 
         g.setColor(Color.DARK_GRAY);
         g.setFont(g.getFont().deriveFont(Font.BOLD, 16f));
         g.drawString("Threads", l + plotW/2 - 30, h - 40);
         g.rotate(-Math.PI/2);
-        g.drawString("Throughput (books/s)", -(t + plotH/2 + 40), 40);
+        g.drawString("books/s", -(t + plotH/2 + 40), 40);
         g.rotate(Math.PI/2);
 
         ImageIO.write(img, "png", outPng.toFile());
