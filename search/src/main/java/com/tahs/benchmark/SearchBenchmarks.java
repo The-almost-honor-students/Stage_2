@@ -1,6 +1,5 @@
 package com.tahs.benchmark;
 
-import com.tahs.clients.IngestionClient;
 import com.tahs.clients.IndexingClient;
 import com.tahs.clients.SearchClient;
 import org.openjdk.jmh.annotations.*;
@@ -23,8 +22,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -43,29 +41,37 @@ public class SearchBenchmarks {
     @Param({"10"})
     public int httpTimeoutSec;
 
-    @Param({"1-1000"})
+    @Param({"datalake"})
+    public String datalakeRoot;
+
+    @Param({"1-70000"})
     public String bootstrapRange;
 
-    @Param({"true"})
-    public boolean enableBootstrap;
+    @Param({"false"})
+    public boolean allowIndexingFromDatalake;
 
-    @Param({"true"})
-    public boolean rebuildIndexAfterIngestion;
-
-    @Param({"200"})
-    public int bootstrapBatchSize;
+    @Param({"false"})
+    public boolean rebuildIndex;
 
     @Param({"8"})
     public int bootstrapParallelism;
 
     @Param({"300"})
+    public int bootstrapBatchSize;
+
+    @Param({"300"})
     public int bootstrapTimeoutSec;
 
-    private static final Path SAMPLES_CSV = Paths.get("benchmarking_results/search/search_samples.csv");
-    private static final Path SUMMARY_CSV = Paths.get("benchmarking_results/search/search_summary.csv");
+    @Param({"3"})
+    public int httpRetries;
+
+    @Param({"false"})
+    public boolean failOnTimeout;
+
+    private static final Path SAMPLES_CSV = Paths.get("benchmarking_results/search/data/search_samples.csv");
+    private static final Path SUMMARY_CSV = Paths.get("benchmarking_results/search/data/search_summary.csv");
 
     private HttpClient http;
-    private IngestionClient ingestionClient;
     private IndexingClient indexingClient;
     private SearchClient searchClient;
     private List<String> terms;
@@ -74,12 +80,11 @@ public class SearchBenchmarks {
     @Setup(Level.Trial)
     public void setup() throws Exception {
         http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(httpTimeoutSec)).build();
-        ingestionClient = new IngestionClient(http);
         indexingClient  = new IndexingClient(http);
         searchClient    = new SearchClient(http);
 
-        terms    = Arrays.stream(queryTerms.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
-        rrTerms  = cycle(terms);
+        terms   = Arrays.stream(queryTerms.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+        rrTerms = cycle(terms);
 
         Files.createDirectories(SAMPLES_CSV.getParent());
         if (!Files.exists(SAMPLES_CSV)) {
@@ -88,7 +93,9 @@ public class SearchBenchmarks {
             }
         }
 
-        if (enableBootstrap) bootstrapIfNeeded();
+        if (allowIndexingFromDatalake) {
+            bootstrapIfNeededFromDatalake();
+        }
     }
 
     @Benchmark
@@ -130,8 +137,11 @@ public class SearchBenchmarks {
                 double p95Lat = percentile(lat, 95);
                 double avgCpu = cpu.stream().mapToDouble(Double::doubleValue).average().orElse(Double.NaN);
                 double avgMem = mem.stream().mapToDouble(Double::doubleValue).average().orElse(Double.NaN);
-                try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(SUMMARY_CSV, StandardCharsets.UTF_8, StandardOpenOption.APPEND, StandardOpenOption.CREATE))) {
-                    w.printf(Locale.US, "%.3f,%.3f,%.3f,%.2f,%.2f%n", avgLat, p50Lat, p95Lat, avgCpu, avgMem);
+                try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(
+                        SUMMARY_CSV, StandardCharsets.UTF_8,
+                        StandardOpenOption.APPEND, StandardOpenOption.CREATE))) {
+                    w.printf(Locale.US, "%.3f,%.3f,%.3f,%.2f,%.2f%n",
+                            avgLat, p50Lat, p95Lat, avgCpu, avgMem);
                 }
             }
         } catch (IOException ignored) {}
@@ -139,104 +149,139 @@ public class SearchBenchmarks {
 
     private void doSearchAndRecord(String term) throws Exception {
         String url = searchEndpoint + "?q=" + URLEncoder.encode(term, StandardCharsets.UTF_8);
-        var req = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url))
-                .timeout(Duration.ofSeconds(httpTimeoutSec)).GET().build();
+
+        double latencyMs;
+        boolean ok = false;
 
         Instant t0 = Instant.now();
-        var resp = http.send(req, java.net.http.HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        for (int attempt = 0; attempt < Math.max(1, httpRetries); attempt++) {
+            try {
+                var req = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url))
+                        .timeout(Duration.ofSeconds(httpTimeoutSec))
+                        .GET()
+                        .build();
+
+                var resp = http.send(req, java.net.http.HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                if (resp.statusCode() >= 400) {
+                    continue;
+                }
+                ok = true;
+                break;
+            } catch (java.net.http.HttpTimeoutException | ConnectException e) {
+                if (attempt + 1 < httpRetries) Thread.sleep(200L * (attempt + 1));
+            }
+        }
         Instant t1 = Instant.now();
+        latencyMs = Duration.between(t0, t1).toNanos() / 1_000_000.0;
 
-        if (resp.statusCode() >= 400) throw new IllegalStateException("HTTP " + resp.statusCode());
+        if (!ok && failOnTimeout) {
+            throw new java.net.http.HttpTimeoutException("request timed out after retries=" + httpRetries);
+        }
 
-        double latencyMs = Duration.between(t0, t1).toNanos() / 1_000_000.0;
-        double cpuPct    = processCpuPercent();
-        double usedMb    = usedMemoryMb();
-        double totalMb   = totalMemoryMb();
+        double cpuPct  = processCpuPercent();
+        double usedMb  = usedMemoryMb();
+        double totalMb = totalMemoryMb();
 
         synchronized (SearchBenchmarks.class) {
-            try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(SAMPLES_CSV, StandardCharsets.UTF_8, StandardOpenOption.APPEND))) {
+            try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(
+                    SAMPLES_CSV, StandardCharsets.UTF_8, StandardOpenOption.APPEND))) {
                 w.printf(Locale.US, "%d,%s,%.3f,%.2f,%.2f,%.2f%n",
                         System.currentTimeMillis(), term, latencyMs, cpuPct, usedMb, totalMb);
             }
         }
     }
 
-    private void bootstrapIfNeeded() throws Exception {
-        if (hasAnyResults(terms.isEmpty() ? "book" : terms.get(0), bootstrapTimeoutSec)) return;
+    private void bootstrapIfNeededFromDatalake() throws Exception {
+        if (hasAnyResults(terms.isEmpty() ? "book" : terms.get(0), Math.max(5, httpTimeoutSec))) return;
 
-        int[] r = parseRange(bootstrapRange);
-        List<Integer> allIds = IntStream.rangeClosed(r[0], r[1]).boxed().collect(Collectors.toList());
-
-        ExecutorService pool = Executors.newFixedThreadPool(bootstrapParallelism);
-        try {
-            for (int i = 0; i < allIds.size(); i += bootstrapBatchSize) {
-                List<Integer> batch = allIds.subList(i, Math.min(i + bootstrapBatchSize, allIds.size()));
-                List<Callable<Void>> tasks = new ArrayList<>(batch.size());
-                for (Integer id : batch) {
-                    tasks.add(() -> {
-                        try { ingestionClient.downloadBook(String.valueOf(id)); } catch (Exception ignored) {}
-                        return null;
-                    });
-                }
-                pool.invokeAll(tasks);
-            }
-        } finally {
-            pool.shutdown();
-            pool.awaitTermination(bootstrapTimeoutSec, TimeUnit.SECONDS);
+        Set<Integer> idsInLake = findBookIdsInDatalake(Paths.get(datalakeRoot));
+        if (idsInLake.isEmpty()) {
+            System.err.println("[bootstrap] Not found datalake=" + Paths.get(datalakeRoot).toAbsolutePath());
+            return;
         }
 
-        if (rebuildIndexAfterIngestion) {
-            try { indexingClient.rebuildIndexForBook(); } catch (Exception ignored) {}
+        int[] r = parseRange(bootstrapRange);
+        List<Integer> ids = idsInLake.stream().filter(id -> id >= r[0] && id <= r[1]).sorted().toList();
+        if (ids.isEmpty()) {
+            System.err.println("[bootstrap] No IDs in range " + r[0] + "-" + r[1] + " in datalake.");
+            return;
+        }
+
+        System.out.println("[bootstrap] Indexing " + ids.size() + " IDs (" + r[0] + "-" + r[1] + ")");
+
+        if (rebuildIndex) {
+            try { indexingClient.rebuildIndexForBook(); }
+            catch (Exception e) { System.err.println("[bootstrap] rebuildIndex failed: " + e.getMessage()); }
         } else {
-            ExecutorService indexPool = Executors.newFixedThreadPool(bootstrapParallelism);
+            ExecutorService pool = Executors.newFixedThreadPool(bootstrapParallelism);
             try {
-                List<Callable<Void>> tasks = new ArrayList<>(allIds.size());
-                for (Integer id : allIds) {
-                    tasks.add(() -> {
-                        try { indexingClient.updateIndexForBook(String.valueOf(id)); } catch (Exception ignored) {}
-                        return null;
-                    });
-                }
-                for (int i = 0; i < tasks.size(); i += bootstrapBatchSize) {
-                    List<Callable<Void>> slice = tasks.subList(i, Math.min(i + bootstrapBatchSize, tasks.size()));
-                    indexPool.invokeAll(slice);
+                List<Integer> allIds = new ArrayList<>(ids);
+                for (int i = 0; i < allIds.size(); i += bootstrapBatchSize) {
+                    List<Integer> batch = allIds.subList(i, Math.min(i + bootstrapBatchSize, allIds.size()));
+                    List<Callable<Void>> tasks = new ArrayList<>(batch.size());
+                    for (Integer id : batch) {
+                        tasks.add(() -> {
+                            try { indexingClient.updateIndexForBook(String.valueOf(id)); } catch (Exception ignored) {}
+                            return null;
+                        });
+                    }
+                    pool.invokeAll(tasks);
                 }
             } finally {
-                poolShutdownQuiet(indexPool);
+                poolShutdownQuiet(pool);
             }
         }
 
         long deadline = System.currentTimeMillis() + bootstrapTimeoutSec * 1000L;
         while (System.currentTimeMillis() < deadline) {
-            if (hasAnyResults(terms.isEmpty() ? "book" : terms.get(0), Math.max(5, httpTimeoutSec))) return;
+            if (hasAnyResults(terms.isEmpty() ? "book" : terms.get(0), Math.max(3, httpTimeoutSec))) return;
             Thread.sleep(500);
         }
-        throw new IllegalStateException("Bootstrap timed out waiting for search to return results");
+        System.err.println("[bootstrap] Timeout waiting results from datalake.");
     }
 
-    private boolean hasAnyResults(String term, int timeoutSec) throws Exception {
-        String url = searchEndpoint + "?q=" + URLEncoder.encode(term, StandardCharsets.UTF_8);
-        var req = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url))
-                .timeout(Duration.ofSeconds(timeoutSec)).GET().build();
+    private static Set<Integer> findBookIdsInDatalake(Path root) {
+        if (!Files.isDirectory(root)) return Set.of();
+        Set<Integer> ids = new HashSet<>();
+        try (Stream<Path> days = Files.list(root)) {
+            days.filter(Files::isDirectory).forEach(day -> {
+                try (Stream<Path> hours = Files.list(day)) {
+                    hours.filter(Files::isDirectory).forEach(hour -> {
+                        try (Stream<Path> files = Files.list(hour)) {
+                            files.filter(Files::isRegularFile).forEach(p -> {
+                                String name = p.getFileName().toString();
+                                int dot = name.indexOf('.');
+                                if (dot > 0) {
+                                    try {
+                                        int id = Integer.parseInt(name.substring(0, dot));
+                                        ids.add(id);
+                                    } catch (NumberFormatException ignored) {}
+                                }
+                            });
+                        } catch (IOException ignored) {}
+                    });
+                } catch (IOException ignored) {}
+            });
+        } catch (IOException ignored) {}
+        return ids;
+    }
 
-        int retries = 3;
-        for (int i = 0; i < retries; i++) {
-            try {
-                var resp = http.send(req, java.net.http.HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-                if (resp.statusCode() >= 400) return false;
-                String t = Optional.ofNullable(resp.body()).orElse("").trim();
-                if (t.isEmpty() || "[]".equals(t) || "{}".equals(t)) return false;
-                if (t.contains("\"results\":0") || t.contains("\"total\":0")) return false;
-                return t.length() > 2;
-            } catch (java.net.http.HttpTimeoutException e) {
-                if (i == retries - 1) throw e;
-                Thread.sleep(300L * (i + 1));
-            } catch (ConnectException e) {
-                if (i == retries - 1) throw new IllegalStateException("Search not reachable at " + searchEndpoint, e);
-                Thread.sleep(300L * (i + 1));
-            }
+    private boolean hasAnyResults(String term, int timeoutSec) {
+        try {
+            String url = searchEndpoint + "?q=" + URLEncoder.encode(term, StandardCharsets.UTF_8);
+            var req = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url))
+                    .timeout(Duration.ofSeconds(Math.min(timeoutSec, 3)))
+                    .GET().build();
+
+            var resp = http.send(req, java.net.http.HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (resp.statusCode() >= 400) return false;
+            String t = Optional.ofNullable(resp.body()).orElse("").trim();
+            if (t.isEmpty() || "[]".equals(t) || "{}".equals(t)) return false;
+            if (t.contains("\"results\":0") || t.contains("\"total\":0")) return false;
+            return t.length() > 2;
+        } catch (Exception e) {
+            return false;
         }
-        return false;
     }
 
     private static void poolShutdownQuiet(ExecutorService es) {
