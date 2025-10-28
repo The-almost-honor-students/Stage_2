@@ -70,7 +70,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.tahs.search.App</mainClass>
+                            <mainClass>com.tahs.Main</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
