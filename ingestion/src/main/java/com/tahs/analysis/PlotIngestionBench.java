@@ -7,502 +7,261 @@ import org.apache.commons.csv.CSVRecord;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.text.DecimalFormat;
 import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class PlotIngestionBench {
+    static Color B(){ return new Color(0,102,204); }
+    static void aa(Graphics2D g){ g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON); g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON); }
+    static double niceNum(double x, boolean round){ double exp=Math.floor(Math.log10(x)); double f=x/Math.pow(10,exp); double nf= round? (f<1.5?1:(f<3?2:(f<7?5:10))) : (f<=1?1:(f<=2?2:(f<=5?5:10))); return nf*Math.pow(10,exp); }
+    static double[] niceTicks(double min,double max,int maxTicks){ if(Double.isNaN(min)||Double.isNaN(max)||min==max) return new double[]{min,max,1}; double range=niceNum(max-min,false); double d=niceNum(range/Math.max(2,(maxTicks-1)),true); double niceMin=Math.floor(min/d)*d; double niceMax=Math.ceil(max/d)*d; return new double[]{niceMin,niceMax,d}; }
+    static void yAxis(Graphics2D g,int l,int t,int w,int h,double y0,double y1,int ticks,String suf){ double[] nt=niceTicks(y0,y1,Math.max(3,ticks)); g.setFont(g.getFont().deriveFont(13f)); FontMetrics fm=g.getFontMetrics(); g.setColor(Color.BLACK); g.drawLine(l,t-6,l,t+h+6); g.drawLine(l,t+h,l+w+6,t+h); for(double v=nt[0]; v<=nt[1]+1e-12; v+=nt[2]){ int y=t+(int)Math.round((1.0-(v-nt[0])/(nt[1]-nt[0]))*h); g.setColor(new Color(230,230,230)); g.drawLine(l,y,l+w,y); String lab=String.format(Locale.ROOT,"%.2f%s",v,(suf==null?"":suf)); int tw=fm.stringWidth(lab); int ty=y+fm.getAscent()/2-2; g.setColor(Color.WHITE); g.fillRoundRect(l-12-tw,ty-fm.getAscent(),tw+8,fm.getHeight(),6,6); g.setColor(Color.BLACK); g.drawString(lab,l-8-tw,ty); g.setColor(Color.BLACK); g.drawLine(l-4,y,l,y); } }
+    static void xTitle(Graphics2D g,String text,int l,int t,int w,int h){ g.setFont(g.getFont().deriveFont(Font.BOLD,16f)); int xx=l+(w-g.getFontMetrics().stringWidth(text))/2; g.setColor(Color.DARK_GRAY); g.drawString(text,xx,t+h+48); }
+    static double parseNum(String s){ return Double.parseDouble(s.replace(" ", "").replace(",", ".")); }
 
-    private static final String BENCH = "ingestion";
+    public static void plotThroughputVsThreads(Path aggCsv, Path outPng) throws Exception {
+        if(!Files.exists(aggCsv)) return;
 
-    public static void main(String[] args) throws Exception {
-        Path base     = Path.of("benchmarking_results").resolve(BENCH);
-        Path dataDir  = base.resolve("data");
-        Path plotsDir = base.resolve("plots");
-        Files.createDirectories(plotsDir);
-
-        Path preferred = (args.length > 0) ? Path.of(args[0]) : dataDir;
-        if (Files.isDirectory(preferred)) dataDir = preferred;
-
-        List<Row> rows = loadBestAvailableRows(dataDir);
-
-        if (rows.isEmpty()) {
-            System.out.println("No se encontraron filas de throughput en ningún CSV dentro de: " + dataDir.toAbsolutePath());
-            return;
+        Map<Integer,List<Double>> byThreads = new TreeMap<>();
+        try(Reader r=Files.newBufferedReader(aggCsv, StandardCharsets.UTF_8);
+            CSVParser p=CSVFormat.DEFAULT.withFirstRecordAsHeader().withIgnoreHeaderCase().withTrim().parse(r)){
+            for(CSVRecord rec: p){
+                if(!"thrpt".equalsIgnoreCase(rec.get("Mode"))) continue;
+                int threads = Integer.parseInt(rec.get("Threads"));
+                double score = parseNum(rec.get("Score"));
+                byThreads.computeIfAbsent(threads,k->new ArrayList<>()).add(score);
+            }
         }
+        if(byThreads.isEmpty()) return;
 
-        List<Row> thrpt = rows.stream()
-                .filter(r -> "thrpt".equals(r.mode) && "iteration".equals(r.phase))
+        List<Integer> thr = new ArrayList<>(byThreads.keySet());
+        List<Double> ops = thr.stream()
+                .map(t -> byThreads.get(t).stream().mapToDouble(Double::doubleValue).average().orElse(0.0))
                 .collect(Collectors.toList());
 
-        if (thrpt.isEmpty()) {
-            thrpt = rows.stream()
-                    .filter(r -> "thrpt".equals(r.mode))
-                    .collect(Collectors.toList());
-            thrpt = thrpt.stream().map(r -> new Row(r.threads, "iteration", r.iteration, r.value, r.unit, r.mode)).toList();
+        int w=1000,h=700,l=110,r=50,t=100,b=100; int pw=w-l-r, ph=h-t-b;
+        double maxOps=ops.stream().mapToDouble(Double::doubleValue).max().orElse(1.0); double[] ntY=niceTicks(0,maxOps*1.15,6);
+
+        BufferedImage img=new BufferedImage(w,h,BufferedImage.TYPE_INT_RGB); Graphics2D g=img.createGraphics(); aa(g);
+        g.setColor(Color.WHITE); g.fillRect(0,0,w,h); g.setColor(B()); g.setFont(g.getFont().deriveFont(Font.BOLD,22f));
+        String title="Ingestion — Throughput vs Threads (books/s)";
+        g.drawString(title,(w-g.getFontMetrics().stringWidth(title))/2,50);
+        yAxis(g,l,t,pw,ph,ntY[0],ntY[1],6,"");
+
+        g.setStroke(new BasicStroke(2.5f));
+        int px=-1,py=-1;
+        int tMin = thr.get(0), tMax = thr.get(thr.size()-1); if(tMax==tMin) tMax = tMin+1;
+        for(int i=0;i<thr.size();i++){
+            double xFrac = (thr.get(i)-tMin)/(double)(tMax-tMin);
+            int x=l+(int)Math.round(xFrac*pw);
+            int y=t+(int)Math.round((1.0-(ops.get(i)-ntY[0])/(ntY[1]-ntY[0]))*ph);
+            g.setColor(B()); g.fillOval(x-4,y-4,8,8);
+            if(px>=0) g.drawLine(px,py,x,y); px=x; py=y;
+            String lbl = String.valueOf(thr.get(i));
+            int tw=g.getFontMetrics().stringWidth(lbl);
+            g.setColor(Color.BLACK); g.drawString(lbl,x-tw/2,t+ph+30);
         }
-
-        if (thrpt.isEmpty()) {
-            System.out.println("No throughput rows found (ni en iteraciones ni en agregados).");
-            return;
-        }
-
-        Map<Integer, List<Row>> byThreads = thrpt.stream()
-                .collect(Collectors.groupingBy(r -> r.threads, TreeMap::new, Collectors.toList()));
-
-        Map<Integer, Stats> agg = aggregateOps(byThreads);
-        writeSummaryThrpt(agg, dataDir.resolve(BENCH + "_summary_throughput.csv"));
-
-        plotThroughputVsThreadsEnhanced(agg, plotsDir.resolve(BENCH + "_throughput_vs_threads.png"));
-        plotSpeedupVsThreads(agg, plotsDir.resolve(BENCH + "_speedup_vs_threads.png"));
-
-        System.out.println("Plots in: " + plotsDir.toAbsolutePath());
+        xTitle(g,"Threads",l,t,pw,ph);
+        ImageIO.write(img,"png",outPng.toFile()); g.dispose();
     }
 
-    private static List<Row> loadBestAvailableRows(Path dataDir) throws IOException {
-        Path merged = dataDir.resolve(BENCH + "_data.csv");
-        if (hasData(merged)) {
-            List<Row> r = loadIterationsCsv(merged);
-            if (!r.isEmpty()) return r;
-        }
-
-        List<Path> iterationParts = listMatching(dataDir, "ingestion_iterations_t*.csv");
-        List<Row> iterAll = new ArrayList<>();
-        for (Path p : iterationParts) if (hasData(p)) iterAll.addAll(loadIterationsCsv(p));
-        if (!iterAll.isEmpty()) return iterAll;
-
-        List<Path> aggs = new ArrayList<>(listMatching(dataDir, "ingestion_t*.csv"));
-        Path aggMerged = dataDir.resolve(BENCH + "_agg.csv");
-        if (Files.exists(aggMerged)) aggs.add(0, aggMerged);
-
-        List<Row> fromAgg = new ArrayList<>();
-        for (Path p : aggs) if (hasData(p)) fromAgg.addAll(loadAggCsvAsThroughputIterations(p));
-        return fromAgg;
-    }
-
-    private static boolean hasData(Path p) {
-        try {
-            if (!Files.exists(p)) return false;
-            try (Stream<String> s = Files.lines(p)) {
-                return s.skip(1).anyMatch(line -> !line.isBlank());
-            }
-        } catch (IOException e) {
-            return false;
-        }
-    }
-
-    private static List<Path> listMatching(Path dir, String glob) throws IOException {
-        if (!Files.isDirectory(dir)) return List.of();
-        try (Stream<Path> s = Files.list(dir)) {
-            PathMatcher m = FileSystems.getDefault().getPathMatcher("glob:" + glob);
-            return s.filter(Files::isRegularFile)
-                    .filter(p -> m.matches(p.getFileName()))
-                    .sorted()
-                    .collect(Collectors.toList());
-        }
-    }
-
-    private static List<Row> loadIterationsCsv(Path csv) throws IOException {
-        try (Reader r = Files.newBufferedReader(csv, StandardCharsets.UTF_8);
-             CSVParser p = CSVFormat.DEFAULT.withFirstRecordAsHeader().withIgnoreHeaderCase().withTrim().parse(r)) {
-            List<Row> out = new ArrayList<>();
-            for (CSVRecord rec : p) {
-                String mode = getLower(rec, "mode");
-                String phase = getLower(rec, "phase");
-                if (mode == null || phase == null) continue;
-                if (!mode.contains("thrpt")) continue;
-
-                Integer threads = parseInt(rec, "threads");
-                Integer iteration = parseInt(rec, "iteration");
-                Double value = parseDouble(rec, "value");
-                String unit = getLower(rec, "unit");
-
-                if (threads == null || value == null) continue;
-                if (iteration == null) iteration = 1;
-                if (unit == null) unit = "ops/s";
-
-                out.add(new Row(threads, phase, iteration, value, unit, "thrpt"));
-            }
-            return out;
-        }
-    }
-
-    private static List<Row> loadAggCsvAsThroughputIterations(Path csv) throws IOException {
-        try (Reader r = Files.newBufferedReader(csv, StandardCharsets.UTF_8);
-             CSVParser p = CSVFormat.DEFAULT.withFirstRecordAsHeader().withIgnoreHeaderCase().withTrim().parse(r)) {
-            List<Row> out = new ArrayList<>();
-            for (CSVRecord rec : p) {
-                String mode = getLower(rec, "Mode");
-                if (mode == null) mode = getLower(rec, "mode");
-                if (mode == null) continue;
-                if (!(mode.contains("thrpt") || mode.contains("throughput"))) continue;
-
-                Integer threads = parseInt(rec, "Threads");
-                if (threads == null) threads = parseInt(rec, "threads");
-                if (threads == null) continue;
-
-                Double score = parseDouble(rec, "Score");
-                if (score == null) score = parseDouble(rec, "score");
-                if (score == null) continue;
-
-                String unit = getLower(rec, "Unit");
-                if (unit == null) unit = getLower(rec, "unit");
-                if (unit == null) unit = "ops/s";
-
-                out.add(new Row(threads, "iteration", 1, score, unit, "thrpt"));
-            }
-            return out;
-        }
-    }
-
-    private static String getLower(CSVRecord rec, String key) {
-        try {
-            String v = rec.get(key);
-            return (v == null) ? null : v.trim().toLowerCase(Locale.ROOT);
-        } catch (IllegalArgumentException ex) {
-            return null;
-        }
-    }
-
-    private static Integer parseInt(CSVRecord rec, String key) {
-        try {
-            String s = rec.get(key);
-            if (s == null || s.trim().isEmpty()) return null;
-            return Integer.parseInt(s.replace(",", "").trim());
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static Double parseDouble(CSVRecord rec, String key) {
-        try {
-            String s = rec.get(key);
-            if (s == null || s.trim().isEmpty()) return null;
-            return Double.parseDouble(s.replace(",", "").trim());
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    static final class Row {
-        final int threads;
-        final String phase;
-        final int iteration;
-        final double value;
-        final String unit;
-        final String mode;
-        Row(int t, String p, int i, double v, String u, String m) {
-            threads = t; phase = p; iteration = i; value = v; unit = u; mode = m;
-        }
-    }
-
-    static final class Stats {
-        final double mean, std;
-        Stats(double m, double s) { mean = m; std = s; }
-    }
-
-    static void enableAA(Graphics2D g) {
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-    }
-
-    static void drawTextWithBg(Graphics2D g, String text, int x, int y) {
-        FontMetrics fm = g.getFontMetrics();
-        int w = fm.stringWidth(text);
-        int h = fm.getAscent();
-        g.setColor(Color.WHITE);
-        g.fillRoundRect(x - 4, y - h, w + 8, h + 6, 6, 6);
-        g.setColor(Color.BLACK);
-        g.drawString(text, x, y);
-    }
-
-    static int minDelta(List<Integer> xs) {
-        int min = Integer.MAX_VALUE;
-        for (int i = 1; i < xs.size(); i++)
-            min = Math.min(min, xs.get(i) - xs.get(i - 1));
-        return (min == Integer.MAX_VALUE) ? 0 : min;
-    }
-
-    static void plotThroughputVsThreadsEnhanced(Map<Integer, Stats> agg, Path outPng) throws IOException {
-        int w = 1100, h = 700, l = 100, r = 60, t = 100, b = 100;
-        int plotW = w - l - r, plotH = h - t - b;
-
-        List<Integer> xs = new ArrayList<>(agg.keySet());
-        Collections.sort(xs);
-
-        double maxY = agg.values().stream().mapToDouble(s -> s.mean + s.std).max().orElse(1.0) * 1.12;
-        double minY = 0;
-
-        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = img.createGraphics();
-        enableAA(g);
-
-        g.setColor(Color.WHITE);
-        g.fillRect(0, 0, w, h);
-
-        g.setFont(g.getFont().deriveFont(Font.BOLD, 20f));
-        g.setColor(new Color(0,102,204));
-        String title = "Ingestion — Throughput vs Threads (books/s)";
-        FontMetrics fmt = g.getFontMetrics();
-        g.drawString(title, (w - fmt.stringWidth(title))/2, 50);
-
-        drawYAxisOps(g, l, t, plotW, plotH, minY, maxY, 6);
-        drawXTicksThreads(g, l, t, plotW, plotH, xs);
-
-        g.setColor(new Color(0,102,204));
-        g.setStroke(new BasicStroke(2f));
-        g.setFont(g.getFont().deriveFont(Font.PLAIN, 14f));
-        FontMetrics fm = g.getFontMetrics();
-
-        double[] nt = niceTicks(minY, maxY, 6);
-        double y0 = nt[0], y1 = nt[1];
-
-        int prevX = -1, prevY = -1;
-        for (int i = 0; i < xs.size(); i++) {
-            int thr = xs.get(i);
-            Stats s = agg.get(thr);
-            int x = xForIndex(i, xs.size(), l, plotW);
-            int y = t + (int) Math.round((1.0 - (s.mean - y0) / (y1 - y0)) * plotH);
-
-            g.fillOval(x - 4, y - 4, 8, 8);
-            if (prevX >= 0) g.drawLine(prevX, prevY, x, y);
-            prevX = x; prevY = y;
-
-            String label = fmtOps(s.mean);
-            int lx = x - fm.stringWidth(label)/2;
-            int ly = Math.max(t + 16, y - 12);
-            g.setColor(Color.WHITE);
-            g.fillRoundRect(lx - 4, ly - fm.getAscent(), fm.stringWidth(label) + 8, fm.getHeight(), 6, 6);
-            g.setColor(Color.BLACK);
-            g.drawString(label, lx, ly);
-            g.setColor(new Color(0,102,204));
-        }
-
-        g.setColor(Color.DARK_GRAY);
-        g.setFont(g.getFont().deriveFont(Font.BOLD, 16f));
-        g.drawString("Threads", l + plotW/2 - 30, h - 40);
-        g.rotate(-Math.PI/2);
-        g.drawString("books/s", -(t + plotH/2 + 40), 40);
-        g.rotate(Math.PI/2);
-
-        ImageIO.write(img, "png", outPng.toFile());
-        g.dispose();
-    }
-
-    static void plotSpeedupVsThreads(Map<Integer, Stats> agg, Path outPng) throws IOException {
-        if (!agg.containsKey(1)) return;
-
-        int w = 1100, h = 700, l = 100, r = 60, t = 100, b = 100;
-        int plotW = w - l - r, plotH = h - t - b;
-
-        List<Integer> xs = new ArrayList<>(agg.keySet());
-        Collections.sort(xs);
-
-        double base = agg.get(1).mean;
-        Map<Integer, Double> speedup = xs.stream()
-                .collect(Collectors.toMap(i -> i, i -> agg.get(i).mean / base, (a, b1) -> a, TreeMap::new));
-
-        double maxY = speedup.values().stream().mapToDouble(Double::doubleValue).max().orElse(1.0) * 1.2;
-        double minY = 0;
-
-        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = img.createGraphics();
-        enableAA(g);
-        g.setColor(Color.WHITE);
-        g.fillRect(0, 0, w, h);
-
-        g.setFont(g.getFont().deriveFont(Font.BOLD, 20f));
-        g.setColor(new Color(0, 102, 204));
-        String title = "Ingestion — Speedup vs Threads";
-        FontMetrics fmTitle = g.getFontMetrics();
-        g.drawString(title, (w - fmTitle.stringWidth(title)) / 2, 50);
-
-        drawYAxisLinear(g, l, t, plotW, plotH, minY, maxY, 6, "×");
-        drawXTicksThreads(g, l, t, plotW, plotH, xs);
-
-        g.setColor(new Color(0, 102, 204));
-        g.setStroke(new BasicStroke(2f));
-
-        int prevX = -1, prevY = -1;
-        FontMetrics fm = g.getFontMetrics();
-        for (int i = 0; i < xs.size(); i++) {
-            int thr = xs.get(i);
-            double sp = speedup.get(thr);
-            int x = xForIndex(i, xs.size(), l, plotW);
-            int y = t + (int) ((1 - (sp - minY) / (maxY - minY)) * plotH);
-            g.fillOval(x - 4, y - 4, 8, 8);
-            if (prevX >= 0) g.drawLine(prevX, prevY, x, y);
-            prevX = x; prevY = y;
-
-            String lbl = String.format(Locale.ROOT, "×%.2f", sp);
-            drawTextWithBg(g, lbl, x - fm.stringWidth(lbl) / 2, y - 14);
-        }
-
-        g.setColor(Color.DARK_GRAY);
-        g.setFont(g.getFont().deriveFont(Font.BOLD, 16f));
-        g.drawString("Threads", l + plotW / 2 - 30, h - 40);
-        g.rotate(-Math.PI / 2);
-        g.drawString("Speedup", -(t + plotH / 2 + 40), 40);
-        g.rotate(Math.PI / 2);
-
-        ImageIO.write(img, "png", outPng.toFile());
-        g.dispose();
-    }
-
-    static void drawXTicksThreads(Graphics2D g, int l, int t, int plotW, int plotH, List<Integer> xs) {
-        g.setFont(g.getFont().deriveFont(Font.PLAIN, 12f));
-        FontMetrics fm = g.getFontMetrics();
-        List<Integer> xPixels = new ArrayList<>();
-        for (int i = 0; i < xs.size(); i++) xPixels.add(xForIndex(i, xs.size(), l, plotW));
-        boolean rotate = minDelta(xPixels) < (fm.stringWidth("00") + 8);
-        for (int i = 0; i < xs.size(); i++) {
-            int x = xPixels.get(i);
-            g.drawLine(x, t + plotH, x, t + plotH + 8);
-            String lbl = xs.get(i).toString();
-            if (!rotate)
-                g.drawString(lbl, x - fm.stringWidth(lbl) / 2, t + plotH + fm.getAscent() + 10);
-            else {
-                Graphics2D g2 = (Graphics2D) g.create();
-                int baseY = t + plotH + fm.getAscent() + 6;
-                g2.rotate(Math.toRadians(45), x, baseY);
-                drawTextWithBg(g2, lbl, x - fm.stringWidth(lbl) / 2, baseY);
-                g2.dispose();
+    public static void plotLatencyDistAcrossIterations(Path itersCsv, Path outPng) throws Exception {
+        if(!Files.exists(itersCsv)) return;
+        List<Double> ms=new ArrayList<>();
+        try(Reader r=Files.newBufferedReader(itersCsv, StandardCharsets.UTF_8);
+            CSVParser p=CSVFormat.DEFAULT.withFirstRecordAsHeader().withIgnoreHeaderCase().withTrim().parse(r)){
+            for(CSVRecord rec:p){
+                if(!"iteration".equalsIgnoreCase(rec.get("phase"))) continue;
+                if(!"avgt".equalsIgnoreCase(rec.get("mode")))     continue;
+                String unit = rec.get("unit").toLowerCase(Locale.ROOT);
+                double v = parseNum(rec.get("value"));
+                double valMs =
+                        unit.contains("s/op")  ? v*1000.0 :
+                                unit.contains("ms/op") ? v :
+                                        unit.contains("us/op") ? v/1000.0 :
+                                                unit.contains("ns/op") ? v/1_000_000.0 : v;
+                ms.add(valMs);
             }
         }
-    }
+        if(ms.isEmpty()) return;
+        Collections.sort(ms);
 
-    static void drawYAxisOps(Graphics2D g, int l, int t, int plotW, int plotH,
-                             double minY, double maxY, int ticks) {
-        g.setColor(Color.BLACK);
-        g.drawLine(l, t, l, t + plotH);
-        g.drawLine(l, t + plotH, l + plotW, t + plotH);
-
-        double[] nt = niceTicks(minY, maxY, Math.max(3, ticks));
-        double y0 = nt[0], y1 = nt[1], step = nt[2];
-
-        g.setFont(g.getFont().deriveFont(Font.PLAIN, 13f));
-        FontMetrics fm = g.getFontMetrics();
-
-        for (double v = y0; v <= y1 + 1e-12; v += step) {
-            int y = t + (int) Math.round((1.0 - (v - y0) / (y1 - y0)) * plotH);
-
-            g.setColor(new Color(230,230,230));
-            g.drawLine(l, y, l + plotW, y);
-
-            g.setColor(Color.BLACK);
-            g.drawLine(l - 4, y, l, y);
-
-            String label = fmtOps(v) + " ops/s";
-            int tw = fm.stringWidth(label);
-            int ty = y + fm.getAscent()/2 - 2;
-
-            g.setColor(Color.WHITE);
-            g.fillRoundRect(l - 10 - tw - 4, ty - fm.getAscent(), tw + 8, fm.getHeight(), 6, 6);
-            g.setColor(Color.BLACK);
-            g.drawString(label, l - 10 - tw, ty);
+        int w=1100,h=700,l=110,r=50,t=100,b=120; int pw=w-l-r, ph=h-t-b;
+        int bins=Math.min(50,Math.max(20,ms.size()/5));
+        double min=0, max=ms.get(ms.size()-1);
+        int[] cnt=new int[bins];
+        for(double v:ms){
+            int i=(int)Math.floor(((v-min)/(max-min+1e-12))*(bins-1));
+            if(i<0)i=0; if(i>=bins)i=bins-1; cnt[i]++;
         }
-    }
+        int maxC=Arrays.stream(cnt).max().orElse(1);
 
-    static void drawYAxisLinear(Graphics2D g, int l, int t, int plotW, int plotH,
-                                double minY, double maxY, int ticks, String suffix) {
-        g.setColor(Color.BLACK);
-        g.drawLine(l, t, l, t + plotH);               // eje Y
-        g.drawLine(l, t + plotH, l + plotW, t + plotH); // eje X
+        BufferedImage img=new BufferedImage(w,h,BufferedImage.TYPE_INT_RGB); Graphics2D g=img.createGraphics(); aa(g);
+        g.setColor(Color.WHITE); g.fillRect(0,0,w,h); g.setColor(B()); g.setFont(g.getFont().deriveFont(Font.BOLD,20f));
+        String title="Ingestion — Latency Distribution Across Iterations (ms/op)";
+        g.drawString(title,(w-g.getFontMetrics().stringWidth(title))/2,50);
 
-        double[] nt = niceTicks(minY, maxY, Math.max(3, ticks));
-        double y0 = nt[0], y1 = nt[1], step = nt[2];
+        yAxis(g,l,t,pw,ph,0,maxC,6,"");
 
-        g.setFont(g.getFont().deriveFont(Font.PLAIN, 13f));
-        FontMetrics fm = g.getFontMetrics();
-
-        for (double v = y0; v <= y1 + 1e-12; v += step) {
-            int y = t + (int) Math.round((1.0 - (v - y0) / (y1 - y0)) * plotH);
-
-            g.setColor(new Color(230,230,230));
-            g.drawLine(l, y, l + plotW, y);
-
-            g.setColor(Color.BLACK);
-            g.drawLine(l - 4, y, l, y);
-
-            String label = (suffix == null)
-                    ? String.format(Locale.ROOT, "%.2f", v)
-                    : String.format(Locale.ROOT, "%.2f%s", v, suffix);
-            int tw = fm.stringWidth(label);
-            int ty = y + fm.getAscent()/2 - 2;
-
-            g.setColor(Color.WHITE);
-            g.fillRoundRect(l - 10 - tw - 4, ty - fm.getAscent(), tw + 8, fm.getHeight(), 6, 6);
-            g.setColor(Color.BLACK);
-            g.drawString(label, l - 10 - tw, ty);
+        double[] ntX=niceTicks(min,max,6); g.setFont(g.getFont().deriveFont(13f)); FontMetrics fm=g.getFontMetrics();
+        for(double v=ntX[0]; v<=ntX[1]+1e-12; v+=ntX[2]){
+            int x=l+(int)Math.round(((v-ntX[0])/(ntX[1]-ntX[0]))*pw);
+            g.setColor(new Color(220,220,220)); g.drawLine(x,t,x,t+ph);
+            String lbl=String.format(Locale.ROOT,"%.0f ms",v);
+            int tw=fm.stringWidth(lbl);
+            g.setColor(Color.BLACK); g.drawString(lbl,x-tw/2,t+ph+fm.getAscent()*2+6);
         }
-    }
-
-    static double[] niceTicks(double min, double max, int maxTicks) {
-        double range = niceNum(max - min, false);
-        double d = niceNum(range / (maxTicks - 1), true);
-        double niceMin = Math.floor(min / d) * d;
-        double niceMax = Math.ceil(max / d) * d;
-        return new double[]{niceMin, niceMax, d};
-    }
-
-    static double niceNum(double x, boolean round) {
-        double exp = Math.floor(Math.log10(x));
-        double f = x / Math.pow(10, exp);
-        double nf;
-        if (round) nf = (f < 1.5) ? 1 : (f < 3) ? 2 : (f < 7) ? 5 : 10;
-        else nf = (f <= 1) ? 1 : (f <= 2) ? 2 : (f <= 5) ? 5 : 10;
-        return nf * Math.pow(10, exp);
-    }
-
-    static String fmtOps(double v) {
-        double abs = Math.abs(v);
-        if (abs >= 1_000_000_000) return String.format(Locale.ROOT, "%.2fG", v / 1_000_000_000d);
-        if (abs >= 1_000_000) return String.format(Locale.ROOT, "%.2fM", v / 1_000_000d);
-        if (abs >= 1_000) return String.format(Locale.ROOT, "%.2fk", v / 1_000d);
-        return String.format(Locale.ROOT, "%.0f", v);
-    }
-
-    static int xForIndex(int i, int count, int l, int plotW) {
-        return l + (count <= 1 ? 0 : (int) Math.round(i * (plotW / (count - 1.0))));
-    }
-
-    static Color[] palette() {
-        return new Color[]{
-                new Color(30,144,255),
-                new Color(46,204,113),
-                new Color(231,76,60),
-                new Color(52,73,94)
-        };
-    }
-
-    static Map<Integer, Stats> aggregateOps(Map<Integer, List<Row>> thrByThreads) {
-        Map<Integer, Stats> out = new TreeMap<>();
-        for (var e : thrByThreads.entrySet()) {
-            double[] vals = e.getValue().stream().mapToDouble(r -> r.value).toArray();
-            double mean = Arrays.stream(vals).average().orElse(0);
-            double std = Math.sqrt(Arrays.stream(vals).map(v -> Math.pow(v - mean, 2)).sum() / vals.length);
-            out.put(e.getKey(), new Stats(mean, std));
+        int barW=Math.max(1,pw/bins); g.setColor(B());
+        for(int i=0;i<bins;i++){
+            int hBar=(int)Math.round((cnt[i]/(double)maxC)*ph);
+            int x=l+i*barW; int y=t+ph-hBar;
+            g.fillRect(x,y,Math.max(1,barW-2),hBar);
         }
-        return out;
+        xTitle(g,"Latency (ms/op)",l,t,pw,ph);
+        ImageIO.write(img,"png",outPng.toFile()); g.dispose();
     }
 
-    static void writeSummaryThrpt(Map<Integer, Stats> thrAgg, Path csv) throws IOException {
-        DecimalFormat df = new DecimalFormat("#.####");
-        StringBuilder sb = new StringBuilder("threads,mean_ops_s,std_ops_s,efficiency\n");
-        double base1 = thrAgg.containsKey(1) ? thrAgg.get(1).mean : -1;
-        for (var e : thrAgg.entrySet()) {
-            double eff = (base1 > 0) ? (e.getValue().mean / (base1 * e.getKey())) : Double.NaN;
-            sb.append(e.getKey()).append(',')
-                    .append(df.format(e.getValue().mean)).append(',')
-                    .append(df.format(e.getValue().std)).append(',')
-                    .append(Double.isNaN(eff) ? "" : df.format(eff)).append('\n');
+    public static void plotCpuOverTime(Path dataDir, Path outPng) throws Exception {
+        List<Path> sys = Files.list(dataDir)
+                .filter(p -> p.getFileName().toString().startsWith("ingestion_sys_t") && p.toString().endsWith(".csv"))
+                .sorted().collect(Collectors.toList());
+        if(sys.isEmpty()) return;
+
+        List<long[]> seriesT=new ArrayList<>();
+        List<double[]> seriesV=new ArrayList<>();
+        long minT=Long.MAX_VALUE,maxT=Long.MIN_VALUE;
+
+        for(Path p:sys){
+            List<Long> ts=new ArrayList<>(); List<Double> v=new ArrayList<>();
+            try(Reader r=Files.newBufferedReader(p,StandardCharsets.UTF_8);
+                CSVParser c=CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(r)){
+                for(CSVRecord rec:c){
+                    long tms=Long.parseLong(rec.get("timestamp_ms"));
+                    double cpu=parseNum(rec.get("cpu_percent"));
+                    ts.add(tms); v.add(cpu);
+                    minT=Math.min(minT,tms); maxT=Math.max(maxT,tms);
+                }
+            }
+            seriesT.add(ts.stream().mapToLong(x->x).toArray());
+            seriesV.add(v.stream().mapToDouble(x->x).toArray());
         }
-        Files.writeString(csv, sb.toString(), StandardCharsets.UTF_8);
+
+        int w=1100,h=700,l=110,r=50,t=100,b=120; int pw=w-l-r, ph=h-t-b;
+        BufferedImage img=new BufferedImage(w,h,BufferedImage.TYPE_INT_RGB); Graphics2D g=img.createGraphics(); aa(g);
+        g.setColor(Color.WHITE); g.fillRect(0,0,w,h); g.setColor(B()); g.setFont(g.getFont().deriveFont(Font.BOLD,20f));
+        String title="Ingestion — CPU Usage Over Time (%)";
+        g.drawString(title,(w-g.getFontMetrics().stringWidth(title))/2,50);
+
+        yAxis(g,l,t,pw,ph,0,100,6," %");
+
+        double minS=0, maxS=Math.max(1e-9,(maxT-minT)/1000.0);
+        double[] ntX=niceTicks(minS,maxS,6);
+        g.setFont(g.getFont().deriveFont(13f)); FontMetrics fm=g.getFontMetrics();
+        for(double v=ntX[0]; v<=ntX[1]+1e-12; v+=ntX[2]){
+            int x=l+(int)Math.round(((v-ntX[0])/(ntX[1]-ntX[0]))*pw);
+            g.setColor(new Color(220,220,220)); g.drawLine(x,t,x,t+ph);
+            String lbl=String.format(Locale.ROOT,"%.0f s",v);
+            int tw=fm.stringWidth(lbl);
+            g.setColor(Color.BLACK); g.drawString(lbl,x-tw/2,t+ph+fm.getAscent()*2+6);
+        }
+
+        g.setStroke(new BasicStroke(2.0f)); g.setColor(Color.BLACK);
+        for(int sIdx=0;sIdx<seriesT.size();sIdx++){
+            long[] ts=seriesT.get(sIdx); double[] vv=seriesV.get(sIdx);
+            int px=-1,py=-1;
+            for(int i=0;i<ts.length;i++){
+                double xs=(ts[i]-minT)/1000.0;
+                int x=l+(int)Math.round(((xs-ntX[0])/(ntX[1]-ntX[0]))*pw);
+                int y=t+(int)Math.round((1.0-(vv[i]/100.0))*ph);
+                if(px>=0) g.drawLine(px,py,x,y);
+                g.fillOval(x-2,y-2,4,4);
+                px=x; py=y;
+            }
+        }
+        xTitle(g,"Time (s)",l,t,pw,ph);
+        ImageIO.write(img,"png",outPng.toFile()); g.dispose();
+    }
+
+    public static void plotMemoryOverTime(Path dataDir, Path outPng) throws Exception {
+        List<Path> sys = Files.list(dataDir)
+                .filter(p -> p.getFileName().toString().startsWith("ingestion_sys_t") && p.toString().endsWith(".csv"))
+                .sorted().collect(Collectors.toList());
+        if(sys.isEmpty()) return;
+
+        List<long[]> seriesT=new ArrayList<>();
+        List<double[]> seriesU=new ArrayList<>();
+        long minT=Long.MAX_VALUE,maxT=Long.MIN_VALUE; double maxMb=1.0;
+
+        for(Path p:sys){
+            List<Long> ts=new ArrayList<>(); List<Double> v=new ArrayList<>();
+            try(Reader r=Files.newBufferedReader(p,StandardCharsets.UTF_8);
+                CSVParser c=CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(r)){
+                for(CSVRecord rec:c){
+                    long tms=Long.parseLong(rec.get("timestamp_ms"));
+                    double used=parseNum(rec.get("used_memory_mb"));
+                    ts.add(tms); v.add(used);
+                    minT=Math.min(minT,tms); maxT=Math.max(maxT,tms); maxMb=Math.max(maxMb,used);
+                }
+            }
+            seriesT.add(ts.stream().mapToLong(x->x).toArray());
+            seriesU.add(v.stream().mapToDouble(x->x).toArray());
+        }
+
+        int w=1100,h=700,l=110,r=50,t=100,b=120; int pw=w-l-r, ph=h-t-b;
+        double[] ntY=niceTicks(0,maxMb*1.1,6);
+
+        BufferedImage img=new BufferedImage(w,h,BufferedImage.TYPE_INT_RGB); Graphics2D g=img.createGraphics(); aa(g);
+        g.setColor(Color.WHITE); g.fillRect(0,0,w,h); g.setColor(B()); g.setFont(g.getFont().deriveFont(Font.BOLD,20f));
+        String title="Ingestion — Memory Usage Over Time (MB)";
+        g.drawString(title,(w-g.getFontMetrics().stringWidth(title))/2,50);
+
+        yAxis(g,l,t,pw,ph,ntY[0],ntY[1],6," MB");
+
+        long minTAll = seriesT.stream().mapToLong(a->a.length==0?Long.MAX_VALUE:a[0]).min().orElse(0);
+        long maxTAll = seriesT.stream().mapToLong(a->a.length==0?0:a[a.length-1]).max().orElse(0);
+        double minS=0, maxS=Math.max(1e-9,(maxTAll-minTAll)/1000.0);
+        double[] ntX=niceTicks(minS,maxS,6);
+        g.setFont(g.getFont().deriveFont(13f)); FontMetrics fm=g.getFontMetrics();
+        for(double v=ntX[0]; v<=ntX[1]+1e-12; v+=ntX[2]){
+            int x=l+(int)Math.round(((v-ntX[0])/(ntX[1]-ntX[0]))*pw);
+            g.setColor(new Color(220,220,220)); g.drawLine(x,t,x,t+ph);
+            String lbl=String.format(Locale.ROOT,"%.0f s",v);
+            int tw=fm.stringWidth(lbl);
+            g.setColor(Color.BLACK); g.drawString(lbl,x-tw/2,t+ph+fm.getAscent()*2+6);
+        }
+
+        g.setStroke(new BasicStroke(2.0f)); g.setColor(Color.BLACK);
+        for(int sIdx=0;sIdx<seriesT.size();sIdx++){
+            long[] ts=seriesT.get(sIdx); double[] vv=seriesU.get(sIdx);
+            int px=-1,py=-1;
+            for(int i=0;i<ts.length;i++){
+                double xs=(ts[i]-minTAll)/1000.0;
+                int x=l+(int)Math.round(((xs-ntX[0])/(ntX[1]-ntX[0]))*pw);
+                int y=t+(int)Math.round((1.0-(vv[i]-ntY[0])/(ntY[1]-ntY[0]))*ph);
+                if(px>=0) g.drawLine(px,py,x,y);
+                g.fillOval(x-2,y-2,4,4);
+                px=x; py=y;
+            }
+        }
+        xTitle(g,"Time (s)",l,t,pw,ph);
+        ImageIO.write(img,"png",outPng.toFile()); g.dispose();
+    }
+
+    public static void main(String[] args) throws Exception {
+        Path base = Paths.get("benchmarking_results/ingestion");
+        Path data = base.resolve("data");
+        Path plots = base.resolve("plots");
+        Files.createDirectories(plots);
+
+        plotThroughputVsThreads(data.resolve("ingestion_agg.csv"),  plots.resolve("ingestion_throughput_vs_threads.png"));
+        plotLatencyDistAcrossIterations(data.resolve("ingestion_data.csv"), plots.resolve("ingestion_latency_distribution.png"));
+        plotCpuOverTime(data, plots.resolve("ingestion_cpu_over_time.png"));
+        plotMemoryOverTime(data, plots.resolve("ingestion_memory_over_time.png"));
+
+        System.out.println("Ingestion plots generated in: " + plots.toAbsolutePath());
     }
 }
