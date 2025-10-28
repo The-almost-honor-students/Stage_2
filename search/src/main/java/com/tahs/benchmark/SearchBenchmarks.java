@@ -3,13 +3,16 @@ package com.tahs.benchmark;
 import com.tahs.clients.IndexingClient;
 import com.tahs.clients.SearchClient;
 import org.openjdk.jmh.annotations.*;
+import org.openjdk.jmh.results.RunResult;
+import org.openjdk.jmh.results.format.ResultFormatType;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.PrintWriter;
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.net.ConnectException;
@@ -20,13 +23,13 @@ import java.nio.file.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 3)
+@Warmup(iterations = 5)
 @Measurement(iterations = 10)
 @Fork(1)
 @State(Scope.Benchmark)
@@ -68,25 +71,26 @@ public class SearchBenchmarks {
     @Param({"false"})
     public boolean failOnTimeout;
 
-    private static final Path SAMPLES_CSV = Paths.get("benchmarking_results/search/data/search_samples.csv");
-    private static final Path SUMMARY_CSV = Paths.get("benchmarking_results/search/data/search_summary.csv");
+    private static final Path DATA_DIR = Paths.get("benchmarking_results/search/data");
+    private static final Path PLOTS_DIR = Paths.get("benchmarking_results/search/plots");
+    private static final Path SAMPLES_CSV = DATA_DIR.resolve("search_samples.csv");
+    private static final Path SUMMARY_CSV = DATA_DIR.resolve("search_summary.csv");
+    private static final Path THRPT_CSV = DATA_DIR.resolve("search_throughput_summary.csv");
 
     private HttpClient http;
-    private IndexingClient indexingClient;
-    private SearchClient searchClient;
     private List<String> terms;
     private Iterator<String> rrTerms;
 
     @Setup(Level.Trial)
     public void setup() throws Exception {
         http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(httpTimeoutSec)).build();
-        indexingClient  = new IndexingClient(http);
-        searchClient    = new SearchClient(http);
+        IndexingClient indexingClient = new IndexingClient(http);
+        SearchClient searchClient = new SearchClient(http);
 
-        terms   = Arrays.stream(queryTerms.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+        terms = Arrays.stream(queryTerms.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
         rrTerms = cycle(terms);
 
-        Files.createDirectories(SAMPLES_CSV.getParent());
+        Files.createDirectories(DATA_DIR);
         if (!Files.exists(SAMPLES_CSV)) {
             try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(SAMPLES_CSV))) {
                 w.println("timestamp_ms,term,latency_ms,cpu_percent,used_memory_mb,total_memory_mb");
@@ -108,7 +112,6 @@ public class SearchBenchmarks {
     public void summarize() {
         try {
             if (!Files.exists(SUMMARY_CSV)) {
-                Files.createDirectories(SUMMARY_CSV.getParent());
                 try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(SUMMARY_CSV))) {
                     w.println("avg_latency_ms,p50_latency_ms,p95_latency_ms,avg_cpu_percent,avg_used_memory_mb");
                 }
@@ -178,8 +181,8 @@ public class SearchBenchmarks {
             throw new java.net.http.HttpTimeoutException("request timed out after retries=" + httpRetries);
         }
 
-        double cpuPct  = processCpuPercent();
-        double usedMb  = usedMemoryMb();
+        double cpuPct = processCpuPercent();
+        double usedMb = usedMemoryMb();
         double totalMb = totalMemoryMb();
 
         synchronized (SearchBenchmarks.class) {
@@ -193,51 +196,8 @@ public class SearchBenchmarks {
 
     private void bootstrapIfNeededFromDatalake() throws Exception {
         if (hasAnyResults(terms.isEmpty() ? "book" : terms.get(0), Math.max(5, httpTimeoutSec))) return;
-
         Set<Integer> idsInLake = findBookIdsInDatalake(Paths.get(datalakeRoot));
-        if (idsInLake.isEmpty()) {
-            System.err.println("[bootstrap] Not found datalake=" + Paths.get(datalakeRoot).toAbsolutePath());
-            return;
-        }
-
-        int[] r = parseRange(bootstrapRange);
-        List<Integer> ids = idsInLake.stream().filter(id -> id >= r[0] && id <= r[1]).sorted().toList();
-        if (ids.isEmpty()) {
-            System.err.println("[bootstrap] No IDs in range " + r[0] + "-" + r[1] + " in datalake.");
-            return;
-        }
-
-        System.out.println("[bootstrap] Indexing " + ids.size() + " IDs (" + r[0] + "-" + r[1] + ")");
-
-        if (rebuildIndex) {
-            try { indexingClient.rebuildIndexForBook(); }
-            catch (Exception e) { System.err.println("[bootstrap] rebuildIndex failed: " + e.getMessage()); }
-        } else {
-            ExecutorService pool = Executors.newFixedThreadPool(bootstrapParallelism);
-            try {
-                List<Integer> allIds = new ArrayList<>(ids);
-                for (int i = 0; i < allIds.size(); i += bootstrapBatchSize) {
-                    List<Integer> batch = allIds.subList(i, Math.min(i + bootstrapBatchSize, allIds.size()));
-                    List<Callable<Void>> tasks = new ArrayList<>(batch.size());
-                    for (Integer id : batch) {
-                        tasks.add(() -> {
-                            try { indexingClient.updateIndexForBook(String.valueOf(id)); } catch (Exception ignored) {}
-                            return null;
-                        });
-                    }
-                    pool.invokeAll(tasks);
-                }
-            } finally {
-                poolShutdownQuiet(pool);
-            }
-        }
-
-        long deadline = System.currentTimeMillis() + bootstrapTimeoutSec * 1000L;
-        while (System.currentTimeMillis() < deadline) {
-            if (hasAnyResults(terms.isEmpty() ? "book" : terms.get(0), Math.max(3, httpTimeoutSec))) return;
-            Thread.sleep(500);
-        }
-        System.err.println("[bootstrap] Timeout waiting results from datalake.");
+        if (idsInLake.isEmpty()) return;
     }
 
     private static Set<Integer> findBookIdsInDatalake(Path root) {
@@ -276,17 +236,10 @@ public class SearchBenchmarks {
             var resp = http.send(req, java.net.http.HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (resp.statusCode() >= 400) return false;
             String t = Optional.ofNullable(resp.body()).orElse("").trim();
-            if (t.isEmpty() || "[]".equals(t) || "{}".equals(t)) return false;
-            if (t.contains("\"results\":0") || t.contains("\"total\":0")) return false;
-            return t.length() > 2;
+            return !(t.isEmpty() || "[]".equals(t) || "{}".equals(t) || t.contains("\"total\":0"));
         } catch (Exception e) {
             return false;
         }
-    }
-
-    private static void poolShutdownQuiet(ExecutorService es) {
-        es.shutdown();
-        try { es.awaitTermination(30, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
     }
 
     private static double processCpuPercent() {
@@ -306,16 +259,6 @@ public class SearchBenchmarks {
     private static double totalMemoryMb() {
         long total = Runtime.getRuntime().maxMemory();
         return total / 1e6;
-    }
-
-    private static int[] parseRange(String spec) {
-        String s = spec.trim();
-        String[] p = s.split("-");
-        if (p.length != 2) throw new IllegalArgumentException("bootstrapRange must be a-b");
-        int a = Integer.parseInt(p[0].trim());
-        int b = Integer.parseInt(p[1].trim());
-        if (a > b) { int t = a; a = b; b = t; }
-        return new int[]{a, b};
     }
 
     private static double parseDouble(String s) {
@@ -341,15 +284,78 @@ public class SearchBenchmarks {
     }
 
     public static void main(String[] args) throws Exception {
-        Options opt = new OptionsBuilder()
+        Files.createDirectories(DATA_DIR);
+        Files.createDirectories(PLOTS_DIR);
+
+        Options opt1 = new OptionsBuilder()
                 .include(SearchBenchmarks.class.getSimpleName())
                 .forks(1)
-                .warmupIterations(3)
+                .warmupIterations(5)
                 .measurementIterations(10)
                 .timeUnit(TimeUnit.MILLISECONDS)
+                .result(SUMMARY_CSV.toString())
+                .resultFormat(ResultFormatType.CSV)
                 .build();
-        new Runner(opt).run();
-        System.out.println("Samples:  " + SAMPLES_CSV.toAbsolutePath());
-        System.out.println("Summary:  " + SUMMARY_CSV.toAbsolutePath());
+        new Runner(opt1).run();
+
+        int[] threads = {1, 2, 4, 8};
+        try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(THRPT_CSV))) {
+            w.println("threads,ops_per_sec");
+            for (int t : threads) {
+                Options opt2 = new OptionsBuilder()
+                        .include(SearchBenchmarks.class.getSimpleName())
+                        .mode(Mode.Throughput)
+                        .threads(t)
+                        .timeUnit(TimeUnit.SECONDS)
+                        .forks(1)
+                        .resultFormat(ResultFormatType.TEXT)
+                        .build();
+                Collection<RunResult> results = new Runner(opt2).run();
+                for (RunResult r : results) {
+                    double thr = r.getPrimaryResult().getScore();
+                    w.printf(Locale.US, "%d,%.3f%n", t, thr);
+                }
+            }
+        }
+
+        Map<Integer, Double> thr = new TreeMap<>();
+        try (BufferedReader br = Files.newBufferedReader(THRPT_CSV)) {
+            String line; boolean first = true;
+            while ((line = br.readLine()) != null) {
+                if (first) { first = false; continue; }
+                String[] p = line.split(",");
+                thr.put(Integer.parseInt(p[0]), Double.parseDouble(p[1]));
+            }
+        }
+        plotThroughput(thr, PLOTS_DIR.resolve("search_throughput_vs_threads.png"));
+        System.out.println("CSV and plots created in " + PLOTS_DIR.toAbsolutePath());
+    }
+
+    private static void plotThroughput(Map<Integer, Double> data, Path outPng) throws IOException {
+        int W = 900, H = 600, L = 80, B = 60;
+        int PW = W - 2 * L, PH = H - B - 100;
+        BufferedImage img = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(Color.WHITE); g.fillRect(0, 0, W, H);
+        g.setColor(Color.BLACK);
+        g.setFont(new Font("SansSerif", Font.BOLD, 18));
+        g.drawString("Search — Throughput vs Threads", L, 40);
+
+        List<Integer> xs = new ArrayList<>(data.keySet());
+        double maxY = data.values().stream().mapToDouble(Double::doubleValue).max().orElse(1);
+        g.drawLine(L, H - B, L + PW, H - B);
+        g.drawLine(L, H - B, L, H - B - PH);
+        g.setColor(new Color(30, 144, 255));
+        int prevX = -1, prevY = -1;
+        for (int i = 0; i < xs.size(); i++) {
+            int x = L + (int)((i / (double)(xs.size()-1)) * PW);
+            int y = (int)(H - B - (data.get(xs.get(i)) / maxY) * PH);
+            g.fillOval(x-4, y-4, 8, 8);
+            if (prevX >= 0) g.drawLine(prevX, prevY, x, y);
+            prevX = x; prevY = y;
+            g.drawString(String.valueOf(xs.get(i)), x-5, H - B + 20);
+        }
+        ImageIO.write(img, "png", outPng.toFile());
+        g.dispose();
     }
 }
