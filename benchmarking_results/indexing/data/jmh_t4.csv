@@ -1,0 +1,3 @@
+"Benchmark","Mode","Threads","Samples","Score","Score Error (99,9%)","Unit","Param: bookId","Param: datalakeDir"
+"com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin","thrpt",4,10,"116,614517","15,483148","ops/s",1342,datalake
+"com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook","avgt",4,10,"0,307636","0,004702","s/op",1342,datalake
