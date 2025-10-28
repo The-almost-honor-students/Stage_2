@@ -1,0 +1,6 @@
+"Benchmark","Mode","Threads","Samples","Score","Score Error (99,9%)","Unit","Param: allowIndexingFromDatalake","Param: bootstrapBatchSize","Param: bootstrapParallelism","Param: bootstrapRange","Param: bootstrapTimeoutSec","Param: datalakeRoot","Param: failOnTimeout","Param: httpRetries","Param: httpTimeoutSec","Param: queryTerms","Param: rebuildIndex","Param: searchEndpoint"
+"com.tahs.benchmark.SearchBenchmarks.searchUnderLoad","avgt",1,10,"30617,939529","3,114302","ms/op",false,300,8,1-70000,300,datalake,false,3,10,"book,science,death,war,love",false,http://localhost:9090/search
+30615.711,30616.014,30622.749,0.02,13.93
+30615.180,30615.347,30622.699,8.05,14.25
+30615.771,30615.216,30624.196,18.80,17.45
+30616.116,30615.478,30625.475,33.03,21.84

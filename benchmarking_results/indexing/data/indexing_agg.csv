@@ -1,9 +1,9 @@
 "Benchmark","Mode","Threads","Samples","Score","Score Error (99,9%)","Unit","Param: bookId","Param: datalakeDir"
-"com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin","thrpt",1,10,"182,972874","0,158125","ops/s",1342,datalake
-"com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook","avgt",1,10,"0,004051","0,000005","s/op",1342,datalake
-"com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin","thrpt",2,10,"371,008383","0,456862","ops/s",1342,datalake
-"com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook","avgt",2,10,"0,004164","0,000037","s/op",1342,datalake
-"com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin","thrpt",4,10,"595,137579","6,821877","ops/s",1342,datalake
-"com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook","avgt",4,10,"0,005249","0,000325","s/op",1342,datalake
-"com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin","thrpt",8,10,"758,844319","34,442388","ops/s",1342,datalake
-"com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook","avgt",8,10,"0,008815","0,000980","s/op",1342,datalake
+"com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin","thrpt",1,10,"41,302914","2,312701","ops/s",1342,datalake
+"com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook","avgt",1,10,"0,228722","0,004838","s/op",1342,datalake
+"com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin","thrpt",2,10,"77,300265","5,231534","ops/s",1342,datalake
+"com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook","avgt",2,10,"0,225850","0,000613","s/op",1342,datalake
+"com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin","thrpt",4,10,"116,614517","15,483148","ops/s",1342,datalake
+"com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook","avgt",4,10,"0,307636","0,004702","s/op",1342,datalake
+"com.tahs.benchmark.IndexingBenchmarks.throughputIndexing_roundRobin","thrpt",8,10,"149,941268","12,005667","ops/s",1342,datalake
+"com.tahs.benchmark.IndexingBenchmarks.indexLatency_perBook","avgt",8,10,"0,469674","0,010357","s/op",1342,datalake

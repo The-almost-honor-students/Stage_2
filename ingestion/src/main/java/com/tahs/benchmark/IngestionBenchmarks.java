@@ -13,11 +13,12 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.VerboseMode;
 
 import java.io.*;
+import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -66,7 +67,7 @@ public class IngestionBenchmarks {
     }
 
     @Benchmark
-    @BenchmarkMode(Mode.Throughput) // books/s
+    @BenchmarkMode(Mode.Throughput)
     public void ingestThroughput_roundRobin(Blackhole bh) {
         int id = nextId();
         boolean ok = ingestion.ingestOne(id, LocalDateTime.now());
@@ -134,9 +135,10 @@ public class IngestionBenchmarks {
         int[] threadSweep = {1, 2, 4, 8};
 
         for (int t : threadSweep) {
-            Path aggCsv  = dataDir.resolve("ingestion_t" + t + ".csv");
+            Path aggCsv  = dataDir.resolve(BENCH + "_t" + t + ".csv");
             Path rawLog  = dataDir.resolve(BENCH + "_t" + t + "_raw.txt");
             Path iterCsv = dataDir.resolve(BENCH + "_iterations_t" + t + ".csv");
+            Path sysCsv  = dataDir.resolve(BENCH + "_sys_t" + t + ".csv");
 
             Options opt = new OptionsBuilder()
                     .include(IngestionBenchmarks.class.getSimpleName())
@@ -153,11 +155,14 @@ public class IngestionBenchmarks {
             PrintStream originalOut = System.out;
             try (FileOutputStream fos = new FileOutputStream(rawLog.toFile());
                  PrintStream fileOut = new PrintStream(fos, true, StandardCharsets.UTF_8);
-                 PrintStream dual = new PrintStream(new DualOutputStream(originalOut, fileOut), true, StandardCharsets.UTF_8)) {
+                 PrintStream dual = new PrintStream(new DualOutputStream(originalOut, fileOut), true, StandardCharsets.UTF_8);
+                 SysSampler sampler = new SysSampler(sysCsv, 200)) {
 
                 System.setOut(dual);
                 System.out.printf("%n=== Running %s benchmark with %d threads ===%n", BENCH, t);
+                sampler.start();
                 Collection<RunResult> _ignore = new Runner(opt).run();
+                sampler.stop();
                 System.out.printf("=== Finished %s benchmark with %d threads ===%n", BENCH, t);
             } finally {
                 System.setOut(originalOut);
@@ -197,6 +202,69 @@ public class IngestionBenchmarks {
         @Override public void write(byte[] buf, int off, int len) { a.write(buf, off, len); b.write(buf, off, len); }
         @Override public void flush() { a.flush(); b.flush(); }
         @Override public void close() { a.flush(); b.flush(); }
+    }
+
+    private static final class SysSampler implements Closeable {
+        private final Path outCsv;
+        private final long periodMs;
+        private final ScheduledExecutorService ses;
+        private volatile ScheduledFuture<?> task;
+        private final Object lock = new Object();
+        private volatile boolean started = false;
+
+        private final com.sun.management.OperatingSystemMXBean osBean =
+                (com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+
+        SysSampler(Path outCsv, long periodMs) throws IOException {
+            this.outCsv = outCsv;
+            this.periodMs = periodMs;
+            this.ses = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread th = new Thread(r, "sys-sampler");
+                th.setDaemon(true);
+                return th;
+            });
+            if (!Files.exists(outCsv) || Files.size(outCsv) == 0) {
+                try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(outCsv, StandardCharsets.UTF_8))) {
+                    w.println("timestamp_ms,cpu_percent,used_memory_mb");
+                }
+            }
+        }
+
+        void start() {
+            synchronized (lock) {
+                if (started) return;
+                started = true;
+                task = ses.scheduleAtFixedRate(this::sampleOnce, 0, periodMs, TimeUnit.MILLISECONDS);
+            }
+        }
+
+        void stop() {
+            synchronized (lock) {
+                if (!started) return;
+                if (task != null) task.cancel(false);
+                ses.shutdown();
+                try { ses.awaitTermination(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
+                started = false;
+            }
+        }
+
+        private void sampleOnce() {
+            long ts = System.currentTimeMillis();
+            double cpuLoad = osBean.getSystemCpuLoad(); // 0.0..1.0 or -1.0 if not available
+            if (cpuLoad < 0) cpuLoad = 0.0;
+            double cpuPct = Math.max(0.0, Math.min(100.0, cpuLoad * 100.0));
+
+            long total = osBean.getTotalPhysicalMemorySize();
+            long free  = osBean.getFreePhysicalMemorySize();
+            long used  = Math.max(0L, total - free);
+            double usedMb = used / (1024.0 * 1024.0);
+
+            try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(outCsv, StandardCharsets.UTF_8, StandardOpenOption.APPEND))) {
+                w.printf(Locale.US, "%d,%.2f,%.2f%n", ts, cpuPct, usedMb);
+            } catch (IOException ignored) {}
+        }
+
+        @Override public void close() { stop(); }
     }
 
     private static void writeIterCsvHeader(Path csv) throws IOException {
@@ -286,7 +354,7 @@ public class IngestionBenchmarks {
     }
 
     private static double parseLocaleNumber(String s) {
-        return Double.parseDouble(s.replace(",", "").trim());
+        return Double.parseDouble(s.replace(" ", "").replace(",", ".").trim());
     }
 
     private static void mergeCsvWithHeader(List<Path> inputs, Path output) throws IOException {
