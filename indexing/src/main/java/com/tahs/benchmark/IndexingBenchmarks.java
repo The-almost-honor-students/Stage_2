@@ -3,6 +3,7 @@ package com.tahs.benchmark;
 import com.tahs.domain.Book;
 import com.tahs.infrastructure.serialization.books.GutenbergHeaderSerializer;
 import com.tahs.infrastructure.serialization.books.TextTokenizer;
+import com.tahs.analysis.PlotIndexingBench;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.results.RunResult;
@@ -12,6 +13,9 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 import java.io.*;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
+import java.lang.management.MemoryUsage;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
@@ -134,11 +138,14 @@ public class IndexingBenchmarks {
         }
 
         final String BENCH = "indexing";
-        Path base = Path.of("benchmarking_results").resolve(BENCH).resolve("data");
-        Files.createDirectories(base);
+        Path base = Path.of("benchmarking_results").resolve(BENCH);
+        Path dataDir = base.resolve("data");
+        Path plotsDir = base.resolve("plots");
+        Files.createDirectories(dataDir);
+        Files.createDirectories(plotsDir);
 
-        Path mergedAgg   = base.resolve(BENCH + "_agg.csv");
-        Path mergedIters = base.resolve(BENCH + "_data.csv");
+        Path mergedAgg   = dataDir.resolve(BENCH + "_agg.csv");
+        Path mergedIters = dataDir.resolve(BENCH + "_data.csv");
         try (PrintWriter all = new PrintWriter(Files.newBufferedWriter(mergedIters, StandardCharsets.UTF_8))) {
             all.println("threads,phase,iteration,value,unit,mode,benchmark");
         }
@@ -147,9 +154,10 @@ public class IndexingBenchmarks {
         List<Path> partialAgg = new ArrayList<>();
 
         for (int t : threadSweep) {
-            Path aggCsv  = base.resolve("jmh_t" + t + ".csv");
-            Path rawLog  = base.resolve(BENCH + "_t" + t + "_raw.txt");
-            Path iterCsv = base.resolve(BENCH + "_iterations_t" + t + ".csv");
+            Path aggCsv  = dataDir.resolve("jmh_t" + t + ".csv");
+            Path rawLog  = dataDir.resolve(BENCH + "_t" + t + "_raw.txt");
+            Path iterCsv = dataDir.resolve(BENCH + "_iterations_t" + t + ".csv");
+            Path sysCsv  = dataDir.resolve(BENCH + "_sys_t" + t + ".csv");
 
             Options opt = new OptionsBuilder()
                     .include(IndexingBenchmarks.class.getSimpleName())
@@ -168,9 +176,10 @@ public class IndexingBenchmarks {
                  PrintStream dual = new PrintStream(new DualOutputStream(originalOut, fileOut), true, StandardCharsets.UTF_8)) {
 
                 System.setOut(dual);
-                System.out.printf("%n=== Running %s benchmark with %d threads ===%n", BENCH, t);
+                SysSampler sampler = new SysSampler(sysCsv);
+                sampler.start();
                 Collection<RunResult> _ignore = new Runner(opt).run();
-                System.out.printf("=== Finished %s benchmark with %d threads ===%n", BENCH, t);
+                sampler.stopAndJoin();
             } finally {
                 System.setOut(originalOut);
             }
@@ -183,11 +192,11 @@ public class IndexingBenchmarks {
         }
 
         mergeCsvWithHeader(partialAgg, mergedAgg);
-        for (Path p : partialAgg) { try { Files.deleteIfExists(p); } catch (Exception ignored) {} }
 
-        System.out.println("Aggregated CSV: " + mergedAgg.toAbsolutePath());
-        System.out.println("Per-thread iteration CSVs folder: " + base.toAbsolutePath());
-        System.out.println("Merged iterations CSV: " + mergedIters.toAbsolutePath());
+        PlotIndexingBench.plotThroughputVsThreads(mergedAgg, plotsDir.resolve("indexing_throughput_vs_threads.png"));
+        PlotIndexingBench.plotLatencyDistAcrossIterations(mergedIters, plotsDir.resolve("indexing_latency_distribution.png"));
+        PlotIndexingBench.plotCpuOverTime(dataDir, plotsDir.resolve("indexing_cpu_over_time.png"));
+        PlotIndexingBench.plotMemoryOverTime(dataDir, plotsDir.resolve("indexing_memory_over_time.png"));
     }
 
     private static final class DualOutputStream extends OutputStream {
@@ -197,6 +206,39 @@ public class IndexingBenchmarks {
         @Override public void write(byte[] buf, int off, int len) { a.write(buf, off, len); b.write(buf, off, len); }
         @Override public void flush() { a.flush(); b.flush(); }
         @Override public void close() { a.flush(); b.flush(); }
+    }
+
+    private static final class SysSampler implements Runnable {
+        private final Path csv;
+        private final Thread th;
+        private volatile boolean run = true;
+        SysSampler(Path csv) { this.csv = csv; this.th = new Thread(this, "indexing-sys-sampler"); }
+        void start() throws IOException {
+            try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(csv, StandardCharsets.UTF_8))) {
+                w.println("timestamp_ms,cpu_percent,used_memory_mb,total_memory_mb");
+            }
+            th.start();
+        }
+        void stopAndJoin() {
+            run = false;
+            try { th.join(); } catch (InterruptedException ignored) {}
+        }
+        @Override public void run() {
+            com.sun.management.OperatingSystemMXBean os =
+                    (com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+            MemoryMXBean memBean = ManagementFactory.getMemoryMXBean();
+            while (run) {
+                long ts = System.currentTimeMillis();
+                double cpu = Math.max(0.0, Math.min(100.0, os.getSystemCpuLoad() * 100.0));
+                MemoryUsage heap = memBean.getHeapMemoryUsage();
+                double usedMb = heap.getUsed() / (1024.0 * 1024.0);
+                double totMb  = heap.getMax()  / (1024.0 * 1024.0);
+                try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(csv, StandardCharsets.UTF_8, StandardOpenOption.APPEND))) {
+                    w.printf(Locale.US, "%d,%.3f,%.3f,%.3f%n", ts, cpu, usedMb, totMb);
+                } catch (IOException ignored) {}
+                try { Thread.sleep(200L); } catch (InterruptedException ignored) {}
+            }
+        }
     }
 
     private static void writeIterCsvHeader(Path csv) throws IOException {
