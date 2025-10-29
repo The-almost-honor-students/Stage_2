@@ -8,11 +8,11 @@ import java.io.IOException;
 
 
 public class Orchestrator {
-
+    //TODO: implement SEARCH client
     private final IngestionClient ingestionClient;
     private final IndexingClient indexingClient;
     private static final long MAX_TIMEOUT = System.currentTimeMillis() + 60 * 1000L;
-    private static final int DOWNLOAD_POLL_INTERVAL_MS = 1000;
+    private static final int DOWNLOAD_POLL_INTERVAL_MS = 500;
 
     public Orchestrator(IngestionClient ingestionClient, IndexingClient indexingClient) {
         this.ingestionClient = ingestionClient;
