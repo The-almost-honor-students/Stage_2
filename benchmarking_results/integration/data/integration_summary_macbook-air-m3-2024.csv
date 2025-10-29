@@ -1,0 +1,7 @@
+"Benchmark","Mode","Threads","Samples","Score","Score Error (99,9%)","Unit","Param: bookIdRange","Param: failOnTimeout","Param: httpRetries","Param: httpTimeoutSec","Param: indexingBaseUrl","Param: ingestionBaseUrl"
+"com.tahs.benchmark.IntegrationBenchmark.orchestrate_once","avgt",1,8,"617,628021","0,947045","ms/op",1-70000,false,3,10,http://localhost:8080,http://localhost:7070
+615.555,614.784,624.593,36.57,79.67
+615.633,614.862,624.621,35.05,79.56
+615.618,614.861,624.474,34.21,80.28
+615.279,614.520,624.145,34.75,81.07
+615.046,614.177,624.338,36.93,82.36
