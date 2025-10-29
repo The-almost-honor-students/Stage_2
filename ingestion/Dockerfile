@@ -16,7 +16,7 @@ RUN mvn -B -e clean install -DskipTests
 FROM openjdk:17-slim
 
 WORKDIR /app
-COPY --from=builder /app/target/*.jar /app.jar
+COPY --from=builder /app/target/ingestion-app.jar /app.jar
 EXPOSE 7070
 
 ENTRYPOINT ["java", "-jar", "/app.jar"]
