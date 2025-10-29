@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit;
 @Fork(1)
 @State(Scope.Benchmark)
 public class IntegrationBenchmark {
-
+    //TODO: implement better plots with measures
     @Param({"http://localhost:7070"})
     public String ingestionBaseUrl;
 
