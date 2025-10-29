@@ -35,6 +35,8 @@ services:
     networks:
       - mongo-net
       - engine-net
+    volumes:
+      - engine-volume:/app
   indexing:
     image: indexing:latest
     container_name: indexing
@@ -43,6 +45,8 @@ services:
     networks:
       - mongo-net
       - engine-net
+    volumes:
+      - engine-volume:/app
   search:
     image: search:latest
     container_name: search
@@ -51,6 +55,8 @@ services:
     networks:
       - mongo-net
       - engine-net
+    volumes:
+      - engine-volume:/app/data
 
 
 networks:
@@ -58,3 +64,5 @@ networks:
     driver: bridge
   engine-net:
     driver: bridge
+volumes:
+  engine-volume:
