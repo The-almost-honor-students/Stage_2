@@ -2,6 +2,7 @@ package com.tahs.benchmark;
 
 import com.tahs.clients.IndexingClient;
 import com.tahs.clients.IngestionClient;
+import com.tahs.clients.SearchClient;
 import com.tahs.orchestrator.Orchestrator;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.results.RunResult;
@@ -20,6 +21,7 @@ import java.net.ConnectException;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -33,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 @Fork(1)
 @State(Scope.Benchmark)
 public class IntegrationBenchmark {
-    //TODO: implement better plots with measures
+    //TODO implement search client
     @Param({"http://localhost:7070"})
     public String ingestionBaseUrl;
 
@@ -51,6 +53,9 @@ public class IntegrationBenchmark {
 
     @Param({"false"})
     public boolean failOnTimeout;
+
+    @Param({"200"})
+    public int maxBooksPerIteration;
 
     private static final String DEVICE =
             System.getProperty("bench.device", "MacBook Air M3 (2024)");
@@ -70,6 +75,9 @@ public class IntegrationBenchmark {
     private List<String> bookIds;
     private Random rnd;
 
+    private List<String> iterBookIds;
+    private int iterCursor;
+
     @Setup(Level.Trial)
     public void setup() throws Exception {
         Files.createDirectories(DATA_DIR);
@@ -82,9 +90,19 @@ public class IntegrationBenchmark {
         http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(httpTimeoutSec)).build();
         IngestionClient ingestionClient = new IngestionClient(http);
         IndexingClient  indexingClient  = new IndexingClient(http);
-        orchestrator = new Orchestrator(ingestionClient, indexingClient);
+        SearchClient searchClient = new SearchClient(http);
+        orchestrator = new Orchestrator(ingestionClient, indexingClient, searchClient);
         bookIds = parseRange(bookIdRange);
         rnd = new Random(42);
+    }
+
+    @Setup(Level.Iteration)
+    public void setupIteration() {
+        List<String> shuffled = new ArrayList<>(bookIds);
+        Collections.shuffle(shuffled, rnd);
+        int n = Math.min(maxBooksPerIteration, shuffled.size());
+        iterBookIds = new ArrayList<>(shuffled.subList(0, n));
+        iterCursor = 0;
     }
 
     private static List<String> parseRange(String spec) {
@@ -109,7 +127,7 @@ public class IntegrationBenchmark {
 
     @Benchmark
     public void orchestrate_once() throws Exception {
-        String bookId = bookIds.get(rnd.nextInt(bookIds.size()));
+        String bookId = iterBookIds.get((iterCursor++) % iterBookIds.size());
         doExecuteAndRecord(bookId);
     }
 
@@ -304,27 +322,132 @@ public class IntegrationBenchmark {
         return sorted.get(lo) * (1 - w) + sorted.get(hi) * w;
     }
 
-    private static void plotThroughput(Map<Integer, Double> data, Path outPng) throws IOException {
-        int W = 900, H = 600, L = 80, B = 80;
-        int PW = W - 2 * L, PH = H - B - 100;
-        BufferedImage img = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = img.createGraphics();
+    private static class NiceTicks {
+        final double min, max, step;
+        NiceTicks(double min, double max, double step) { this.min=min; this.max=max; this.step=step; }
+    }
+    private static NiceTicks niceTicks(double dataMin, double dataMax, int maxTicks) {
+        if (Double.isNaN(dataMin) || Double.isNaN(dataMax)) { dataMin = 0; dataMax = 1; }
+        if (dataMax == dataMin) dataMax = dataMin + 1;
+        double range = niceNum(dataMax - dataMin, false);
+        double step = niceNum(range / Math.max(2, (maxTicks - 1)), true);
+        double niceMin = Math.floor(dataMin / step) * step;
+        double niceMax = Math.ceil(dataMax / step) * step;
+        return new NiceTicks(niceMin, niceMax, step);
+    }
+    private static double niceNum(double x, boolean round) {
+        double exp = Math.floor(Math.log10(x));
+        double f = x / Math.pow(10, exp);
+        double nf;
+        if (round) nf = (f < 1.5) ? 1 : (f < 3) ? 2 : (f < 7) ? 5 : 10;
+        else       nf = (f <= 1)  ? 1 : (f <= 2) ? 2 : (f <= 5) ? 5 : 10;
+        return nf * Math.pow(10, exp);
+    }
+    private static class PlotArea {
+        final int L,B,PW,PH,W,H;
+        PlotArea(int L,int B,int PW,int PH,int W,int H){this.L=L;this.B=B;this.PW=PW;this.PH=PH;this.W=W;this.H=H;}
+        int x0(){ return L; }
+        int y0(){ return H - B; }
+        int top(){ return H - B - PH; }
+        Rectangle clip(){ return new Rectangle(L, top(), PW, PH); }
+    }
+    private static PlotArea drawAxesWithTicks(Graphics2D g, int W, int H,
+                                              String title, String xLabel, String yLabel,
+                                              double xMin, double xMax, double yMin, double yMax) {
+
+        int topMargin = 70;
+        int L = 90, B = 90;
+        int PW = W - 2*L;
+        int PH = H - B - topMargin;
+
+
         g.setColor(Color.WHITE); g.fillRect(0, 0, W, H);
+
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
         g.setColor(Color.BLACK);
         g.setFont(new Font("SansSerif", Font.BOLD, 18));
-        g.drawString("Throughput vs Threads — " + DEVICE, L, 40);
-        drawAxes(g, L, B, W, H, PH, "Threads", "Throughput (ops/sec)");
-        g.setColor(new Color(30, 144, 255));
+        FontMetrics fm = g.getFontMetrics();
+        int titleW = fm.stringWidth(title);
+        g.drawString(title, (W - titleW) / 2, 30);
+
+        g.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        g.drawLine(L, H - B, L + PW, H - B);         // eje X
+        g.drawLine(L, H - B, L, H - B - PH);         // eje Y
+
+        String xLab = xLabel == null ? "" : xLabel;
+        String yLab = yLabel == null ? "" : yLabel;
+        g.drawString(xLab, L + PW/2 - g.getFontMetrics().stringWidth(xLab)/2, H - 25);
+        g.rotate(-Math.PI / 2);
+        g.drawString(yLab, -(H - B - PH/2 + g.getFontMetrics().stringWidth(yLab)/2), 25);
+        g.rotate(Math.PI / 2);
+
+        NiceTicks xt = niceTicks(xMin, xMax, 8);
+        NiceTicks yt = niceTicks(yMin, yMax, 8);
+
+        g.setColor(new Color(230,230,230));
+        for (double xv = xt.min; xv <= xt.max + 1e-9; xv += xt.step) {
+            int x = L + (int) ((xv - xt.min) / (xt.max - xt.min) * PW);
+            g.drawLine(x, H - B, x, H - B - PH);
+        }
+        for (double yv = yt.min; yv <= yt.max + 1e-9; yv += yt.step) {
+            int y = H - B - (int) ((yv - yt.min) / (yt.max - yt.min) * PH);
+            g.drawLine(L, y, L + PW, y);
+        }
+
+        g.setColor(Color.BLACK);
+        DecimalFormat dfX = new DecimalFormat("0.###");
+        DecimalFormat dfY = new DecimalFormat("0.###");
+
+        for (double xv = xt.min; xv <= xt.max + 1e-9; xv += xt.step) {
+            int x = L + (int) ((xv - xt.min) / (xt.max - xt.min) * PW);
+            g.drawLine(x, H - B, x, H - B + 5);
+            String s = dfX.format(xv);
+            int w = g.getFontMetrics().stringWidth(s);
+            g.drawString(s, x - w/2, H - B + 20);
+        }
+        for (double yv = yt.min; yv <= yt.max + 1e-9; yv += yt.step) {
+            int y = H - B - (int) ((yv - yt.min) / (yt.max - yt.min) * PH);
+            g.drawLine(L - 5, y, L, y);
+            String s = dfY.format(yv);
+            int w = g.getFontMetrics().stringWidth(s);
+            g.drawString(s, L - 10 - w, y + 5);
+        }
+
+        PlotArea area = new PlotArea(L, B, PW, PH, W, H);
+        g.setClip(area.clip());
+        return area;
+    }
+
+    private static void plotThroughput(Map<Integer, Double> data, Path outPng) throws IOException {
+        int W = 900, H = 600;
+        BufferedImage img = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+
         List<Integer> xs = new ArrayList<>(data.keySet());
-        double maxY = data.values().stream().mapToDouble(Double::doubleValue).max().orElse(1);
+        Collections.sort(xs);
+        double minX = xs.get(0), maxX = xs.get(xs.size()-1);
+        double minY = 0.0, maxY = data.values().stream().mapToDouble(Double::doubleValue).max().orElse(1.0);
+        maxY *= 1.05;
+
+        PlotArea area = drawAxesWithTicks(g, W, H,
+                "Throughput vs Threads — " + DEVICE, "Threads", "Throughput (ops/sec)",
+                minX, maxX, minY, maxY);
+
+        g.setColor(new Color(30, 144, 255));
         int prevX = -1, prevY = -1;
         for (int i = 0; i < xs.size(); i++) {
-            int x = L + (int) ((i / (double) Math.max(1, xs.size() - 1)) * PW);
-            int y = (int) (H - B - (data.get(xs.get(i)) / maxY) * PH);
+            double xv = xs.get(i);
+            double yv = data.get(xs.get(i));
+            int x = area.L + (int) ((xv - minX) / (maxX - minX) * area.PW);
+            int y = area.H - area.B - (int) ((yv - minY) / (maxY - minY) * area.PH);
             g.fillOval(x - 4, y - 4, 8, 8);
             if (prevX >= 0) g.drawLine(prevX, prevY, x, y);
             prevX = x; prevY = y;
         }
+
+        g.setClip(null);
         ImageIO.write(img, "png", outPng.toFile());
         g.dispose();
     }
@@ -334,89 +457,96 @@ public class IntegrationBenchmark {
         double max = lat.stream().mapToDouble(Double::doubleValue).max().orElse(1);
         double min = lat.stream().mapToDouble(Double::doubleValue).min().orElse(0);
         if (max <= min) max = min + 1;
+
         int[] hist = new int[bins];
         for (double v : lat) {
             int b = (int) ((v - min) / (max - min) * bins);
             if (b >= bins) b = bins - 1;
+            if (b < 0) b = 0;
             hist[b]++;
         }
         int maxCount = Arrays.stream(hist).max().orElse(1);
-        int W = 900, H = 600, L = 80, B = 80, PW = W - 2 * L, PH = H - B - 100;
+
+        int W = 900, H = 600;
         BufferedImage img = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
-        g.setColor(Color.WHITE); g.fillRect(0, 0, W, H);
-        g.setColor(Color.BLACK);
-        g.setFont(new Font("SansSerif", Font.BOLD, 18));
-        g.drawString("Latency Histogram (ms) — " + DEVICE, L, 40);
-        drawAxes(g, L, B, W, H, PH, "Latency (ms)", "Frequency");
+
+        PlotArea area = drawAxesWithTicks(g, W, H,
+                "Latency Histogram (ms) — " + DEVICE, "Latency (ms)", "Frequency",
+                min, max, 0, maxCount * 1.05);
+
         g.setColor(new Color(34, 139, 34));
-        int barW = Math.max(1, PW / bins);
+        int barW = Math.max(1, area.PW / bins);
         for (int i = 0; i < bins; i++) {
-            int h = (int) ((hist[i] / (double) maxCount) * PH);
-            int x = L + i * barW;
-            g.fillRect(x, H - B - h, barW - 2, h);
+            double x0 = min + i * (max - min) / bins;
+            double x1 = min + (i + 1) * (max - min) / bins;
+            int x = area.L + (int) ((x0 - min) / (max - min) * area.PW);
+            int h = (int) ((hist[i] / (double) (maxCount * 1.05)) * area.PH);
+            int y = area.H - area.B - h;
+            g.fillRect(x, y, Math.max(1, barW - 2), h);
         }
+
+        g.setClip(null);
         ImageIO.write(img, "png", outPng.toFile());
         g.dispose();
     }
 
     private static void plotCpuSeries(List<long[]> series, Path outPng) throws IOException {
         if (series.isEmpty()) return;
-        int W = 900, H = 600, L = 80, B = 80, PW = W - 2 * L, PH = H - B - 100;
+        int W = 900, H = 600;
         BufferedImage img = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
-        g.setColor(Color.WHITE); g.fillRect(0, 0, W, H);
-        g.setColor(Color.BLACK);
-        g.setFont(new Font("SansSerif", Font.BOLD, 18));
-        g.drawString("CPU (%) over Time — " + DEVICE, L, 40);
-        drawAxes(g, L, B, W, H, PH, "Time (ms)", "CPU (%)");
-        long t0 = series.get(0)[0], tN = series.get(series.size() - 1)[0], span = Math.max(1, tN - t0);
+
+        long t0 = series.get(0)[0], tN = series.get(series.size() - 1)[0];
+        double minX = 0, maxX = Math.max(1, tN - t0);
+        double minY = 0, maxY = 100;
+
+        PlotArea area = drawAxesWithTicks(g, W, H,
+                "CPU (%) over Time — " + DEVICE, "Time (ms)", "CPU (%)",
+                minX, maxX, minY, maxY);
+
         g.setColor(new Color(75, 0, 130));
         int prevX = -1, prevY = -1;
         for (long[] r : series) {
             long ts = r[0], cpu = r[1];
-            int x = L + (int) ((ts - t0) * 1.0 * PW / span);
-            int y = (int) (H - B - (cpu / 100.0) * PH);
+            int x = area.L + (int) (((ts - t0) - minX) / (maxX - minX) * area.PW);
+            int y = area.H - area.B - (int) ((cpu - minY) / (maxY - minY) * area.PH);
             if (prevX >= 0) g.drawLine(prevX, prevY, x, y);
             prevX = x; prevY = y;
         }
+
+        g.setClip(null);
         ImageIO.write(img, "png", outPng.toFile());
         g.dispose();
     }
 
     private static void plotMemSeries(List<long[]> series, Path outPng) throws IOException {
         if (series.isEmpty()) return;
-        int W = 900, H = 600, L = 80, B = 80, PW = W - 2 * L, PH = H - B - 100;
+        int W = 900, H = 600;
         BufferedImage img = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
-        g.setColor(Color.WHITE); g.fillRect(0, 0, W, H);
-        g.setColor(Color.BLACK);
-        g.setFont(new Font("SansSerif", Font.BOLD, 18));
-        g.drawString("Memory (MB) over Time — " + DEVICE, L, 40);
-        drawAxes(g, L, B, W, H, PH, "Time (ms)", "Used Memory (MB)");
-        long t0 = series.get(0)[0], tN = series.get(series.size() - 1)[0], span = Math.max(1, tN - t0);
-        long maxUsed = series.stream().mapToLong(r -> r[2]).max().orElse(1);
+
+        long t0 = series.get(0)[0], tN = series.get(series.size() - 1)[0];
+        double minX = 0, maxX = Math.max(1, tN - t0);
+        long maxUsedRaw = series.stream().mapToLong(r -> r[2]).max().orElse(1);
+        double minY = 0, maxY = maxUsedRaw * 1.05;
+
+        PlotArea area = drawAxesWithTicks(g, W, H,
+                "Memory (MB) over Time — " + DEVICE, "Time (ms)", "Used Memory (MB)",
+                minX, maxX, minY, maxY);
+
         g.setColor(new Color(220, 20, 60));
         int prevX = -1, prevY = -1;
         for (long[] r : series) {
             long ts = r[0], used = r[2];
-            int x = L + (int) ((ts - t0) * 1.0 * PW / span);
-            int y = (int) (H - B - (used / (double) maxUsed) * PH);
+            int x = area.L + (int) (((ts - t0) - minX) / (maxX - minX) * area.PW);
+            int y = area.H - area.B - (int) ((used - minY) / (maxY - minY) * area.PH);
             if (prevX >= 0) g.drawLine(prevX, prevY, x, y);
             prevX = x; prevY = y;
         }
+
+        g.setClip(null);
         ImageIO.write(img, "png", outPng.toFile());
         g.dispose();
-    }
-
-    private static void drawAxes(Graphics2D g, int L, int B, int W, int H, int PH, String xLabel, String yLabel) {
-        g.setColor(Color.BLACK);
-        g.drawLine(L, H - B, W - L, H - B);
-        g.drawLine(L, H - B, L, H - B - PH);
-        g.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        g.drawString(xLabel, W / 2 - (xLabel.length() * 3), H - 30);
-        g.rotate(-Math.PI / 2);
-        g.drawString(yLabel, -H / 2 - (yLabel.length() * 3), 30);
-        g.rotate(Math.PI / 2);
     }
 }
