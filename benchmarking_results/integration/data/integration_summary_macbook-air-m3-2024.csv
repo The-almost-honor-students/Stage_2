@@ -1,7 +1,7 @@
-"Benchmark","Mode","Threads","Samples","Score","Score Error (99,9%)","Unit","Param: bookIdRange","Param: failOnTimeout","Param: httpRetries","Param: httpTimeoutSec","Param: indexingBaseUrl","Param: ingestionBaseUrl"
-"com.tahs.benchmark.IntegrationBenchmark.orchestrate_once","avgt",1,8,"617,628021","0,947045","ms/op",1-70000,false,3,10,http://localhost:8080,http://localhost:7070
-615.555,614.784,624.593,36.57,79.67
-615.633,614.862,624.621,35.05,79.56
-615.618,614.861,624.474,34.21,80.28
-615.279,614.520,624.145,34.75,81.07
-615.046,614.177,624.338,36.93,82.36
+"Benchmark","Mode","Threads","Samples","Score","Score Error (99,9%)","Unit","Param: bookIdRange","Param: failOnTimeout","Param: httpRetries","Param: httpTimeoutSec","Param: indexingBaseUrl","Param: ingestionBaseUrl","Param: maxBooksPerIteration"
+"com.tahs.benchmark.IntegrationBenchmark.orchestrate_once","avgt",1,8,"618,291670","1,359133","ms/op",1-70000,false,3,10,http://localhost:8080,http://localhost:7070,200
+615.135,614.322,624.260,35.87,81.09
+615.161,614.382,624.153,35.25,81.07
+615.188,614.454,624.000,34.81,81.28
+615.191,614.443,623.981,35.16,81.75
+615.085,614.331,624.037,37.11,82.73
