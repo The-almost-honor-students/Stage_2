@@ -1,0 +1,3 @@
+Benchmark                              (bookIdRange)  (failOnTimeout)  (httpRetries)  (httpTimeoutSec)      (indexingBaseUrl)     (ingestionBaseUrl)  (maxBooksPerIteration)        (searchBaseUrl)   Mode  Cnt   Score   Error  Units
+IntegrationBenchmark.orchestrate_once        1-70000            false              3                10  http://localhost:8080  http://localhost:7070                     300  http://localhost:9090  thrpt    8  26,364 ± 0,041  ops/s
+IntegrationBenchmark.search_once             1-70000            false              3                10  http://localhost:8080  http://localhost:7070                     300  http://localhost:9090  thrpt    8  26,383 ± 0,043  ops/s
