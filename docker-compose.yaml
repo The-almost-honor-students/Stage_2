@@ -40,6 +40,8 @@ services:
   indexing:
     image: indexing:latest
     container_name: indexing
+    environment:
+      - MONGO_URL=mongodb://mongodb_books:27017
     ports:
       - "8080:8080"
     networks:
