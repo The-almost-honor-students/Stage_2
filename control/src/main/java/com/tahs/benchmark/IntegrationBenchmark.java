@@ -60,7 +60,7 @@ public class IntegrationBenchmark {
     public int maxBooksPerIteration;
 
     private static final String DEVICE =
-            System.getProperty("bench.device", "MacBook Air M3 (2024)");
+            System.getProperty("bench.device", "Asus Vivobook (OS: Ubuntu)");
 
     private static final String DEVICE_SLUG =
             DEVICE.trim().toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
