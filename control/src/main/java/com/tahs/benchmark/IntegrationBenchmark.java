@@ -53,7 +53,7 @@ public class IntegrationBenchmark {
     @Param({"false"})
     public boolean failOnTimeout;
 
-    @Param({"200"})
+    @Param({"300"})
     public int maxBooksPerIteration;
 
     private static final String DEVICE =
@@ -89,10 +89,16 @@ public class IntegrationBenchmark {
         http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(httpTimeoutSec)).build();
         IngestionClient ingestionClient = new IngestionClient(http);
         IndexingClient  indexingClient  = new IndexingClient(http);
-        SearchClient searchClient = new SearchClient(http);
+        SearchClient    searchClient    = new SearchClient(http);
         orchestrator = new Orchestrator(ingestionClient, indexingClient, searchClient);
+
         bookIds = parseRange(bookIdRange);
         rnd = new Random(42);
+
+        Collections.shuffle(bookIds, rnd);
+        int n = Math.min(maxBooksPerIteration, bookIds.size());
+        iterBookIds = new ArrayList<>(bookIds.subList(0, n)); // ← siempre los mismos 500 en todo el trial
+        iterCursor = 0;
     }
 
     @Setup(Level.Iteration)
@@ -153,6 +159,41 @@ public class IntegrationBenchmark {
             try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(SAMPLES_CSV, StandardCharsets.UTF_8, StandardOpenOption.APPEND))) {
                 w.printf(Locale.US, "%d,%s,%.3f,%.2f,%.2f,%.2f%n",
                         System.currentTimeMillis(), bookId, latencyMs, cpuPct, usedMb, totalMb);
+            }
+        }
+    }
+
+    @Benchmark
+    public void search_once() throws Exception {
+        String query = iterBookIds.get((iterCursor++) % iterBookIds.size());
+        doSearchAndRecord(query);
+    }
+
+    private void doSearchAndRecord(String query) throws Exception {
+        boolean ok = false;
+        Instant t0 = Instant.now();
+        for (int attempt = 0; attempt < Math.max(1, httpRetries); attempt++) {
+            try {
+                orchestrator.getSearchClient().search(query);
+                ok = true;
+                break;
+            } catch (ConnectException | java.net.http.HttpTimeoutException e) {
+                if (attempt + 1 < httpRetries) Thread.sleep(200L * (attempt + 1));
+            }
+        }
+        Instant t1 = Instant.now();
+        double latencyMs = Duration.between(t0, t1).toNanos() / 1_000_000.0;
+        if (!ok && failOnTimeout) {
+            throw new java.net.http.HttpTimeoutException("search timed out after retries=" + httpRetries);
+        }
+        double cpuPct  = processCpuPercent();
+        double usedMb  = usedMemoryMb();
+        double totalMb = totalMemoryMb();
+        synchronized (IntegrationBenchmark.class) {
+            try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(
+                    SAMPLES_CSV, StandardCharsets.UTF_8, StandardOpenOption.APPEND))) {
+                w.printf(Locale.US, "%d,%s,%.3f,%.2f,%.2f,%.2f%n",
+                        System.currentTimeMillis(), query, latencyMs, cpuPct, usedMb, totalMb);
             }
         }
     }
