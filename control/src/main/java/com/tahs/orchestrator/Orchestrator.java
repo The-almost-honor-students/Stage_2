@@ -32,6 +32,7 @@ public class Orchestrator {
             var response = indexingClient.updateIndexForBook(bookId);
             if (response.statusCode() == 200) {
                 IndexingTracker.markAsIndexed(bookId);
+                waitUntilSearchSeesBook(bookId);
             } else {
                 throw new IOException("Fail with Status: " + response.statusCode() +
                         " and body: " + response.body());
@@ -42,6 +43,18 @@ public class Orchestrator {
                 if (checkBookIsDownloaded(bookId)) DownloadTracker.markAsDownloaded(bookId);
             }
         }
+    }
+
+    private void waitUntilSearchSeesBook(String query) throws IOException, InterruptedException {
+        long deadline = System.currentTimeMillis() + 30_000L;
+        while (System.currentTimeMillis() < deadline) {
+            var resp = this.searchClient.search(query);
+            if (resp.statusCode() == 200 && resp.body() != null && !resp.body().isBlank()) {
+                return;
+            }
+            Thread.sleep(DOWNLOAD_POLL_INTERVAL_MS);
+        }
+        throw new IOException("Search not ready for query=" + query);
     }
 
     public SearchClient getSearchClient() {
