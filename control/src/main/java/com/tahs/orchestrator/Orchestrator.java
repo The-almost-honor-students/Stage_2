@@ -2,49 +2,74 @@ package com.tahs.orchestrator;
 
 import com.tahs.clients.IndexingClient;
 import com.tahs.clients.IngestionClient;
+import com.tahs.clients.SearchClient;
 import com.tahs.tracker.DownloadTracker;
 import com.tahs.tracker.IndexingTracker;
+
 import java.io.IOException;
 
-
 public class Orchestrator {
-
     private final IngestionClient ingestionClient;
     private final IndexingClient indexingClient;
-    private static final long MAX_TIMEOUT = System.currentTimeMillis() + 60 * 1000L;
-    private static final int DOWNLOAD_POLL_INTERVAL_MS = 1000;
+    private final SearchClient searchClient;
 
-    public Orchestrator(IngestionClient ingestionClient, IndexingClient indexingClient) {
+    private static final long MAX_TIMEOUT = System.currentTimeMillis() + 60 * 1000L;
+    private static final int DOWNLOAD_POLL_INTERVAL_MS = 500;
+
+    public Orchestrator(IngestionClient ingestionClient,
+                        IndexingClient indexingClient,
+                        SearchClient searchClient) {
         this.ingestionClient = ingestionClient;
         this.indexingClient = indexingClient;
+        this.searchClient = searchClient;
     }
 
     public void execute(String bookId) throws IOException, InterruptedException {
         DownloadTracker.createFileIfNotExists();
         IndexingTracker.createFileIfNotExists();
-        if(areMissingBooksIndexed()) {
+
+        if (areMissingBooksIndexed()) {
             var response = indexingClient.updateIndexForBook(bookId);
             if (response.statusCode() == 200) {
                 IndexingTracker.markAsIndexed(bookId);
+                waitUntilSearchSeesBook(bookId);
             } else {
-                throw new IOException("Fail with Status: " + response.statusCode() + " and body: " + response.body());
+                throw new IOException("Fail with Status: " + response.statusCode() +
+                        " and body: " + response.body());
             }
         } else {
-            if(!DownloadTracker.isDownloaded(bookId)){
+            if (!DownloadTracker.isDownloaded(bookId)) {
                 ingestionClient.downloadBook(bookId);
-                if(checkBookIsDownloaded(bookId)) DownloadTracker.markAsDownloaded(bookId);
+                if (checkBookIsDownloaded(bookId)) DownloadTracker.markAsDownloaded(bookId);
             }
         }
+    }
+
+    private void waitUntilSearchSeesBook(String query) throws IOException, InterruptedException {
+        long deadline = System.currentTimeMillis() + 30_000L;
+        while (System.currentTimeMillis() < deadline) {
+            var resp = this.searchClient.search(query);
+            if (resp.statusCode() == 200 && resp.body() != null && !resp.body().isBlank()) {
+                return;
+            }
+            Thread.sleep(DOWNLOAD_POLL_INTERVAL_MS);
+        }
+        throw new IOException("Search not ready for query=" + query);
+    }
+
+    public SearchClient getSearchClient() {
+        return this.searchClient;
     }
 
     private static boolean areMissingBooksIndexed() {
         return DownloadTracker.countDownloadedBooks() - IndexingTracker.countIndexedBooks() > 0;
     }
+
     private boolean checkBookIsDownloaded(String bookId) throws IOException, InterruptedException {
-        while(System.currentTimeMillis() < MAX_TIMEOUT) {
+        while (System.currentTimeMillis() < MAX_TIMEOUT) {
             var response = this.ingestionClient.status(bookId);
             if (response.statusCode() == 200 && isDownloadedResponse(response.body())) {
-                System.out.println("Libro descargado y listo.");
+                System.out.println("Book downloaded.");
                 return true;
             }
             Thread.sleep(DOWNLOAD_POLL_INTERVAL_MS);

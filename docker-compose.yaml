@@ -27,7 +27,44 @@ services:
       - mongo
     networks:
       - mongo-net
+  ingestion:
+    image: ingestion:latest
+    container_name: ingestion
+    ports:
+      - "7070:7070"
+    networks:
+      - mongo-net
+      - engine-net
+    volumes:
+      - engine-volume:/app
+  indexing:
+    image: indexing:latest
+    container_name: indexing
+    environment:
+      - MONGO_URL=mongodb://mongodb_books:27017
+    ports:
+      - "8080:8080"
+    networks:
+      - mongo-net
+      - engine-net
+    volumes:
+      - engine-volume:/app
+  search:
+    image: search:latest
+    container_name: search
+    ports:
+      - "9090:9090"
+    networks:
+      - mongo-net
+      - engine-net
+    volumes:
+      - engine-volume:/app/data
+
 
 networks:
   mongo-net:
     driver: bridge
+  engine-net:
+    driver: bridge
+volumes:
+  engine-volume:

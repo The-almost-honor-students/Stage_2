@@ -41,3 +41,5 @@ build/
 .DS_Store
 
 ../mongo_data/
+
+*.env
