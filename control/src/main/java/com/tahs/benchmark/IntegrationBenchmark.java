@@ -41,6 +41,9 @@ public class IntegrationBenchmark {
     @Param({"http://localhost:8080"})
     public String indexingBaseUrl;
 
+    @Param({"http://localhost:9090"})
+    public String searchBaseUrl;
+
     @Param({"1-70000"})
     public String bookIdRange;
 
@@ -86,7 +89,11 @@ public class IntegrationBenchmark {
                 w.println("timestamp_ms,book_id,latency_ms,cpu_percent,used_memory_mb,total_memory_mb");
             }
         }
-        http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(httpTimeoutSec)).build();
+
+        http = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(httpTimeoutSec))
+                .build();
+
         IngestionClient ingestionClient = new IngestionClient(http);
         IndexingClient  indexingClient  = new IndexingClient(http);
         SearchClient    searchClient    = new SearchClient(http);
@@ -97,7 +104,7 @@ public class IntegrationBenchmark {
 
         Collections.shuffle(bookIds, rnd);
         int n = Math.min(maxBooksPerIteration, bookIds.size());
-        iterBookIds = new ArrayList<>(bookIds.subList(0, n)); // ← siempre los mismos 500 en todo el trial
+        iterBookIds = new ArrayList<>(bookIds.subList(0, n));
         iterCursor = 0;
     }
 
