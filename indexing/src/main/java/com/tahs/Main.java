@@ -113,7 +113,7 @@ public class Main {
                 dbUrl,
                 databaseName,
                 collectionMetaData,
-                collectionMetaData,
+                collectionIndex,
                 port
         );
     }
