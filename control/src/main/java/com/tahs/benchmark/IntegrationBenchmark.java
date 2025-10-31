@@ -129,8 +129,6 @@ public class IntegrationBenchmark {
         );
     }
 
-
-
     @Setup(Level.Iteration)
     public void setupIteration() {
         List<String> shuffled = new ArrayList<>(bookIds);
