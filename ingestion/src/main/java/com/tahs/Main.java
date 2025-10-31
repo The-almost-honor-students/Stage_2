@@ -1,5 +1,7 @@
 package com.tahs;
 
+import com.tahs.config.AppConfig;
+import io.github.cdimascio.dotenv.Dotenv;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 
@@ -7,6 +9,7 @@ import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
+import java.util.Optional;
 
 import com.tahs.infrastructure.FsDatalakeRepository;
 import com.tahs.application.ports.DatalakeRepository;
@@ -23,6 +26,11 @@ public class Main {
     private static IngestionService ingestionService;
 
     public static void main(String[] args) {
+        var dotenv = Dotenv.configure()
+                .ignoreIfMissing()
+                .load();
+        var appConfig = CheckEnvVars(dotenv);
+
         System.out.println("[MAIN] Booting ingestion service + HTTP API...");
 
         try {
@@ -34,7 +42,7 @@ public class Main {
         }
 
         DatalakeRepository datalakeRepo = new FsDatalakeRepository(DATALAKE_PATH);
-        ingestionService = new IngestionService(datalakeRepo, Paths.get(STAGING_PATH), TOTAL_BOOKS, MAX_RETRIES);
+        ingestionService = new IngestionService(datalakeRepo, Paths.get(STAGING_PATH), TOTAL_BOOKS, MAX_RETRIES, appConfig);
 
         Javalin app = Javalin.create(cfg -> cfg.http.defaultContentType = "application/json").start(PORT);
 
@@ -99,4 +107,17 @@ public class Main {
                 "books", books
         ));
     }
+
+    private static AppConfig CheckEnvVars(Dotenv dotenv) {
+        String urlGutenberg = Optional.ofNullable(dotenv.get("URL_GUTENBERG"))
+                .orElse(System.getenv("URL_GUTENBERG"));
+        String portStr = Optional.ofNullable(dotenv.get("PORT"))
+                .orElse(System.getenv("PORT"));
+        int port = portStr != null ? Integer.parseInt(portStr) : 7070;
+        return new AppConfig(
+                urlGutenberg,
+                port
+        );
+    }
+
 }

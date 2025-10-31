@@ -1,6 +1,7 @@
 package com.tahs.application.usecase;
 
 import com.tahs.application.ports.DatalakeRepository;
+import com.tahs.config.AppConfig;
 
 import java.io.IOException;
 import java.net.URI;
@@ -22,22 +23,25 @@ public class IngestionService {
     private final Path stagingDir;
     private final int totalBooks;
     private final int maxRetries;
+    private final AppConfig appConfig;
     private final Random rng = new Random();
 
     public IngestionService(DatalakeRepository datalakeRepo,
                             Path stagingDir,
                             int totalBooks,
-                            int maxRetries) {
+                            int maxRetries,
+                            AppConfig appConfig) {
         this.datalakeRepo = datalakeRepo;
         this.stagingDir = stagingDir.toAbsolutePath().normalize();
         this.totalBooks = totalBooks;
         this.maxRetries = maxRetries;
+        this.appConfig = appConfig;
     }
 
     public boolean downloadBookToStaging(int bookId) {
         try {
             Files.createDirectories(stagingDir);
-            String url = String.format("https://www.gutenberg.org/cache/epub/%d/pg%d.txt", bookId, bookId);
+            String url = String.format("%s/cache/epub/%d/pg%d.txt",appConfig.urlGutenberg(), bookId, bookId);
             HttpClient client = HttpClient.newHttpClient();
             HttpRequest req = HttpRequest.newBuilder().uri(URI.create(url)).build();
             HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
