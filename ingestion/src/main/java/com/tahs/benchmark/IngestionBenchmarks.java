@@ -2,7 +2,9 @@ package com.tahs.benchmark;
 
 import com.tahs.application.ports.DatalakeRepository;
 import com.tahs.application.usecase.IngestionService;
+import com.tahs.config.AppConfig;
 import com.tahs.infrastructure.FsDatalakeRepository;
+import io.github.cdimascio.dotenv.Dotenv;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.results.RunResult;
@@ -53,12 +55,28 @@ public class IngestionBenchmarks {
 
     @Setup(Level.Trial)
     public void setup() {
+        var dotenv = Dotenv.configure()
+                .ignoreIfMissing()
+                .load();
+        var appConfig = CheckEnvVars(dotenv);
         rr = new AtomicInteger(0);
         DatalakeRepository repo = new FsDatalakeRepository(datalakeDir);
-        ingestion = new IngestionService(repo, Paths.get(stagingDir), totalBooks, maxRetries);
+        ingestion = new IngestionService(repo, Paths.get(stagingDir), totalBooks, maxRetries, appConfig);
         candidates = parseIds(bookIds);
         ensureDirs();
         purgeStaging();
+    }
+
+    private static AppConfig CheckEnvVars(Dotenv dotenv) {
+        String urlGutenberg = Optional.ofNullable(dotenv.get("URL_GUTENBERG"))
+                .orElse(System.getenv("URL_GUTENBERG"));
+        String portStr = Optional.ofNullable(dotenv.get("PORT"))
+                .orElse(System.getenv("PORT"));
+        int port = portStr != null ? Integer.parseInt(portStr) : 7070;
+        return new AppConfig(
+                urlGutenberg,
+                port
+        );
     }
 
     @TearDown(Level.Iteration)
