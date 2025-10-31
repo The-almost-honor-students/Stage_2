@@ -10,7 +10,7 @@ public class IndexingClient {
     private static final String INDEXING_ENDPOINT = "http://localhost:8080/index";
     private final HttpClient httpClient;
 
-    public IndexingClient(HttpClient httpClient) {
+    public IndexingClient(HttpClient httpClient, String s) {
         this.httpClient = httpClient;
     }
 

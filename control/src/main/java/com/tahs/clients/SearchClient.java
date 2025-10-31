@@ -15,7 +15,7 @@ public class SearchClient {
     private static final String SEARCH_ENDPOINT = "http://localhost:9090";
     private final HttpClient httpClient;
 
-    public SearchClient(HttpClient httpClient) {
+    public SearchClient(HttpClient httpClient, String s) {
         this.httpClient = httpClient;
     }
 

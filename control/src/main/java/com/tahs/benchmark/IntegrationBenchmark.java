@@ -3,7 +3,9 @@ package com.tahs.benchmark;
 import com.tahs.clients.IndexingClient;
 import com.tahs.clients.IngestionClient;
 import com.tahs.clients.SearchClient;
+import com.tahs.config.AppConfig;
 import com.tahs.orchestrator.Orchestrator;
+import io.github.cdimascio.dotenv.Dotenv;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.results.RunResult;
 import org.openjdk.jmh.results.format.ResultFormatType;
@@ -82,6 +84,10 @@ public class IntegrationBenchmark {
 
     @Setup(Level.Trial)
     public void setup() throws Exception {
+        var dotenv = Dotenv.configure()
+                .ignoreIfMissing()
+                .load();
+        var appConfig = CheckEnvVars(dotenv);
         Files.createDirectories(DATA_DIR);
         Files.createDirectories(PLOTS_DIR);
         if (!Files.exists(SAMPLES_CSV)) {
@@ -94,9 +100,9 @@ public class IntegrationBenchmark {
                 .connectTimeout(Duration.ofSeconds(httpTimeoutSec))
                 .build();
 
-        IngestionClient ingestionClient = new IngestionClient(http);
-        IndexingClient  indexingClient  = new IndexingClient(http);
-        SearchClient    searchClient    = new SearchClient(http);
+        IngestionClient ingestionClient = new IngestionClient(http, appConfig.urlIngestion());
+        IndexingClient  indexingClient  = new IndexingClient(http, appConfig.urlIndex());
+        SearchClient    searchClient    = new SearchClient(http, appConfig.urlSearch());
         orchestrator = new Orchestrator(ingestionClient, indexingClient, searchClient);
 
         bookIds = parseRange(bookIdRange);
@@ -107,6 +113,23 @@ public class IntegrationBenchmark {
         iterBookIds = new ArrayList<>(bookIds.subList(0, n));
         iterCursor = 0;
     }
+
+    private static AppConfig CheckEnvVars(Dotenv dotenv) {
+        String urlIngestion = Optional.ofNullable(dotenv.get("INGESTION_URL"))
+                .orElse(System.getenv("INGESTION_URL"));
+        String urlIndexing = Optional.ofNullable(dotenv.get("INDEXING_URL"))
+                .orElse(System.getenv("INDEXING_URL"));
+        String urlSearch = Optional.ofNullable(dotenv.get("SEARCH_URL"))
+                .orElse(System.getenv("SEARCH_URL"));
+
+        return new AppConfig(
+                urlIngestion,
+                urlIndexing,
+                urlSearch
+        );
+    }
+
+
 
     @Setup(Level.Iteration)
     public void setupIteration() {
