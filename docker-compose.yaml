@@ -52,6 +52,8 @@ services:
   search:
     image: search:latest
     container_name: search
+    environment:
+      - MONGO_URL=mongodb://mongodb_books:27017
     ports:
       - "9090:9090"
     networks:
