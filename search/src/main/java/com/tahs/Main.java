@@ -74,7 +74,7 @@ public class Main {
                 .orElse(System.getenv("COLLECTION_INDEX"));
         String portStr = Optional.ofNullable(dotenv.get("PORT"))
                 .orElse(System.getenv("PORT"));
-        int port = portStr != null ? Integer.parseInt(portStr) : 8080;
+        int port = portStr != null ? Integer.parseInt(portStr) : 9090;
         return new AppConfig(
                 dbUrl,
                 databaseName,
