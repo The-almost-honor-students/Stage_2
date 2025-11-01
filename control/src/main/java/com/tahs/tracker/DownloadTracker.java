@@ -3,13 +3,16 @@ package com.tahs.tracker;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.*;
+import java.util.Optional;
 
 public class DownloadTracker {
 
-    private static final Path FILE_PATH = Paths.get("control", "downloaded_books.txt");
+    private static final Path DATA_DIR = Paths.get("control");
+    private static final Path FILE_PATH = DATA_DIR.resolve("downloaded_books.txt");
 
     public static void createFileIfNotExists() throws IOException {
         try {
+            Files.createDirectories(DATA_DIR);
             if (Files.notExists(FILE_PATH)) {
                 Files.createFile(FILE_PATH);
             }
