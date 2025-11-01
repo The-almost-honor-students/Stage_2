@@ -13,7 +13,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 
 public class Main {
-
+private static final int MAX_BOOKS = 70000;
     public static void main(String[] args) {
         try {
             var dotenv = Dotenv.configure()
@@ -25,7 +25,7 @@ public class Main {
             IndexingClient indexingClient = new IndexingClient(httpClient, appConfig.urlIndex());
             SearchClient searchClient = new SearchClient(httpClient, appConfig.urlSearch());
             var orchestrator = new Orchestrator(ingestionClient, indexingClient, searchClient);
-            var bookId = ThreadLocalRandom.current().nextInt(1, 70001);
+            var bookId = ThreadLocalRandom.current().nextInt(1, MAX_BOOKS + 1);
             orchestrator.execute(String.valueOf(bookId));
         } catch (Exception e) {
             throw new RuntimeException("Error executing orchestrator", e);
