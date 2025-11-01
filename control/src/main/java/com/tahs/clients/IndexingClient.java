@@ -7,15 +7,16 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 public class IndexingClient {
-    private static final String INDEXING_ENDPOINT = "http://localhost:8080/index";
     private final HttpClient httpClient;
+    private final String urlIndexing;
 
-    public IndexingClient(HttpClient httpClient) {
+    public IndexingClient(HttpClient httpClient, String urlIndexing) {
         this.httpClient = httpClient;
+        this.urlIndexing = urlIndexing;
     }
 
     public HttpResponse<String> updateIndexForBook(String bookId) throws IOException, InterruptedException {
-        String urlIndexingBook = INDEXING_ENDPOINT + "/update/" + bookId;
+        String urlIndexingBook = this.urlIndexing + "/update/" + bookId;
         var request = HttpRequest.newBuilder(URI.create(urlIndexingBook))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.noBody()).build();
@@ -24,7 +25,7 @@ public class IndexingClient {
     }
 
     public HttpResponse<String> rebuildIndexForBook() throws IOException, InterruptedException {
-        String urlIndexingBook = INDEXING_ENDPOINT + "/rebuild";
+        String urlIndexingBook = this.urlIndexing + "/rebuild";
         var request = HttpRequest.newBuilder(URI.create(urlIndexingBook))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.noBody()).build();
@@ -32,7 +33,7 @@ public class IndexingClient {
     }
 
     public HttpResponse<String> status() throws IOException, InterruptedException {
-        String urlIndexingBook = INDEXING_ENDPOINT + "/status";
+        String urlIndexingBook = this.urlIndexing + "/status";
         var request = HttpRequest.newBuilder(URI.create(urlIndexingBook))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.noBody()).build();

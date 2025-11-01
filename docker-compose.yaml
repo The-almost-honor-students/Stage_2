@@ -61,6 +61,23 @@ services:
       - engine-net
     volumes:
       - engine-volume:/app/data
+  control:
+    image: control:latest
+    ports:
+      - "6060:6060"
+    depends_on:
+      - indexing
+      - ingestion
+      - search
+    container_name: control
+    environment:
+      - INGESTION_URL=http://ingestion:7070
+      - INDEX_URL=http://indexing:8080
+      - SEARCH_URL=http://search:9090
+    networks:
+      - engine-net
+    volumes:
+      - engine-volume:/app/data
 
 
 networks:

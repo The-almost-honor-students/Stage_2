@@ -7,15 +7,16 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 public class IngestionClient {
-    private static final String INGESTION_ENDPOINT = "http://localhost:7070/ingest";
     private final HttpClient httpClient;
+    private final String urlIngestion;
 
-    public IngestionClient(HttpClient httpClient) {
+    public IngestionClient(HttpClient httpClient, String urlIngestion) {
         this.httpClient = httpClient;
+        this.urlIngestion = urlIngestion;
     }
 
     public HttpResponse<String> downloadBook(String bookId) throws IOException, InterruptedException {
-        String urlIngestBook = INGESTION_ENDPOINT + "/" + bookId;
+        String urlIngestBook = this.urlIngestion + "/" + bookId;
         var request = HttpRequest.newBuilder(URI.create(urlIngestBook))
                 .POST(HttpRequest.BodyPublishers.noBody()).build();
         System.out.println("Download book " + bookId + "...");
@@ -23,7 +24,7 @@ public class IngestionClient {
     }
 
     public HttpResponse<String> status(String bookId) throws IOException, InterruptedException {
-        String urlIndexingBook = INGESTION_ENDPOINT + "/status/" + bookId;
+        String urlIndexingBook = this.urlIngestion + "/status/" + bookId;
         var request = HttpRequest.newBuilder(URI.create(urlIndexingBook))
                 .header("Content-Type", "application/json")
                 .GET().build();
@@ -31,7 +32,7 @@ public class IngestionClient {
     }
 
     public HttpResponse<String> list() throws IOException, InterruptedException {
-        String urlIndexingBook = INGESTION_ENDPOINT + "/list";
+        String urlIndexingBook = this.urlIngestion + "/list";
         var request = HttpRequest.newBuilder(URI.create(urlIndexingBook))
                 .header("Content-Type", "application/json")
                 .GET().build();

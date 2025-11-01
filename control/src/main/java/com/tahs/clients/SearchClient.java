@@ -12,15 +12,16 @@ import java.util.Map;
 import java.util.StringJoiner;
 
 public class SearchClient {
-    private static final String SEARCH_ENDPOINT = "http://localhost:9090";
     private final HttpClient httpClient;
+    private final String urlSearch;
 
-    public SearchClient(HttpClient httpClient) {
+    public SearchClient(HttpClient httpClient, String urlSearch) {
         this.httpClient = httpClient;
+        this.urlSearch = urlSearch;
     }
 
     public HttpResponse<String> search(String q) throws IOException, InterruptedException {
-        String url = SEARCH_ENDPOINT + "/search?q=" + enc(q);
+        String url = this.urlSearch + "/search?q=" + enc(q);
         var request = HttpRequest.newBuilder(URI.create(url))
                 .GET()
                 .build();
@@ -37,7 +38,7 @@ public class SearchClient {
         StringJoiner sj = new StringJoiner("&");
         for (var e : params.entrySet()) sj.add(enc(e.getKey()) + "=" + enc(e.getValue()));
 
-        String url = SEARCH_ENDPOINT + "/search" + (params.isEmpty() ? "" : "?" + sj);
+        String url = this.urlSearch + "/search" + (params.isEmpty() ? "" : "?" + sj);
         var request = HttpRequest.newBuilder(URI.create(url))
                 .GET()
                 .build();
@@ -45,7 +46,7 @@ public class SearchClient {
     }
 
     public HttpResponse<String> getMetadataById(String bookId) throws IOException, InterruptedException {
-        String url = SEARCH_ENDPOINT + "/metadata/" + enc(bookId);
+        String url = this.urlSearch + "/metadata/" + enc(bookId);
         var request = HttpRequest.newBuilder(URI.create(url))
                 .GET()
                 .build();
@@ -53,7 +54,7 @@ public class SearchClient {
     }
 
     public HttpResponse<String> getBooksByTerm(String term) throws IOException, InterruptedException {
-        String url = SEARCH_ENDPOINT + "/index/term?term=" + enc(term);
+        String url = this.urlSearch + "/index/term?term=" + enc(term);
         var request = HttpRequest.newBuilder(URI.create(url))
                 .GET()
                 .build();

@@ -7,10 +7,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class IndexingTracker {
-    private static final Path FILE_PATH = Paths.get("control", "indexed_books.txt");
+    private static final Path DATA_DIR = Paths.get("control");
+    private static final Path FILE_PATH = Paths.get("indexed_books.txt");
 
     public static void createFileIfNotExists() throws IOException {
         try {
+            Files.createDirectories(DATA_DIR);
             if (Files.notExists(FILE_PATH)) {
                 Files.createFile(FILE_PATH);
             }
