@@ -56,8 +56,11 @@ public class IntegrationBenchmark {
     @Param({"false"})
     public boolean failOnTimeout;
 
-    @Param({"10"})
+    @Param({"2"})
     public int maxBooksPerIteration;
+
+    @Param({"data big life"})
+    public String keywordsSource;
 
     private static final String DEVICE =
             System.getProperty("bench.device", "MacBook Air M3 (2024)");
@@ -82,6 +85,10 @@ public class IntegrationBenchmark {
 
     private List<String> iterBookIds;
     private int iterCursor;
+
+    private List<String> searchKeywords = new ArrayList<>();
+    private List<String> iterKeywords = new ArrayList<>();
+    private int keywordCursor;
 
     @Setup(Level.Trial)
     public void setup() throws Exception {
@@ -108,6 +115,14 @@ public class IntegrationBenchmark {
         int n = Math.min(maxBooksPerIteration, bookIds.size());
         iterBookIds = new ArrayList<>(bookIds.subList(0, n));
         iterCursor = 0;
+
+        this.searchKeywords = loadKeywords(keywordsSource);
+        if (this.searchKeywords.isEmpty()) {
+            this.searchKeywords = List.of("book", "the", "project", "gutenberg");
+        }
+        iterKeywords = new ArrayList<>(this.searchKeywords);
+        Collections.shuffle(iterKeywords, rnd);
+        keywordCursor = 0;
     }
 
     @Setup(Level.Iteration)
@@ -117,6 +132,10 @@ public class IntegrationBenchmark {
         int n = Math.min(maxBooksPerIteration, shuffled.size());
         iterBookIds = new ArrayList<>(shuffled.subList(0, n));
         iterCursor = 0;
+
+        iterKeywords = new ArrayList<>(searchKeywords);
+        Collections.shuffle(iterKeywords, rnd);
+        keywordCursor = 0;
     }
 
     private static List<String> parseRange(String spec) {
@@ -139,6 +158,37 @@ public class IntegrationBenchmark {
         return out;
     }
 
+    private static List<String> loadKeywords(String source) {
+        try {
+            if (source == null || source.trim().isEmpty()) return new ArrayList<>();
+            source = source.trim();
+            if (source.startsWith("file:")) {
+                Path p = Paths.get(source.substring("file:".length()));
+                if (Files.exists(p)) {
+                    List<String> lines = Files.readAllLines(p, StandardCharsets.UTF_8);
+                    List<String> cleaned = new ArrayList<>(lines.size());
+                    for (String s : lines) {
+                        String t = s == null ? "" : s.trim();
+                        if (!t.isEmpty()) cleaned.add(t);
+                    }
+                    return cleaned;
+                } else {
+                    return new ArrayList<>();
+                }
+            } else {
+                String[] parts = source.split("\\s+");
+                List<String> out = new ArrayList<>();
+                for (String s : parts) {
+                    String t = s.trim();
+                    if (!t.isEmpty()) out.add(t);
+                }
+                return out;
+            }
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
     @Benchmark
     public void ingest_then_index_once() throws Exception {
         String bookId = iterBookIds.get((iterCursor++) % iterBookIds.size());
@@ -148,38 +198,30 @@ public class IntegrationBenchmark {
     private void doIngestThenIndexAndRecord(String bookId) throws Exception {
         boolean ok = false;
         Instant t0 = Instant.now();
-
         for (int attempt = 0; attempt < Math.max(1, httpRetries); attempt++) {
             try {
                 ingestionClient.downloadBook(bookId);
-
                 if (!waitUntilIngested(bookId, httpRetries)) {
                     throw new java.net.http.HttpTimeoutException("ingestion status wait timed out");
                 }
-
                 var resp = indexingClient.updateIndexForBook(bookId);
                 if (resp.statusCode() != 200) {
                     throw new IOException("Indexing failed. Status=" + resp.statusCode() + " Body=" + resp.body());
                 }
-
                 ok = true;
                 break;
             } catch (ConnectException | java.net.http.HttpTimeoutException e) {
                 if (attempt + 1 < httpRetries) Thread.sleep(200L * (attempt + 1));
             }
         }
-
         Instant t1 = Instant.now();
         double latencyMs = Duration.between(t0, t1).toNanos() / 1_000_000.0;
-
         if (!ok && failOnTimeout) {
             throw new java.net.http.HttpTimeoutException("ingest->index sequence timed out after retries=" + httpRetries);
         }
-
         double cpuPct  = processCpuPercent();
         double usedMb  = usedMemoryMb();
         double totalMb = totalMemoryMb();
-
         synchronized (IntegrationBenchmark.class) {
             try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(
                     SAMPLES_CSV, StandardCharsets.UTF_8, StandardOpenOption.APPEND))) {
@@ -205,8 +247,8 @@ public class IntegrationBenchmark {
 
     @Benchmark
     public void search_once() throws Exception {
-        String query = iterBookIds.get((iterCursor++) % iterBookIds.size());
-        doSearchAndRecord(query);
+        String keyword = iterKeywords.get((keywordCursor++) % iterKeywords.size());
+        doSearchAndRecord(keyword);
     }
 
     private void doSearchAndRecord(String query) throws Exception {
@@ -214,7 +256,10 @@ public class IntegrationBenchmark {
         Instant t0 = Instant.now();
         for (int attempt = 0; attempt < Math.max(1, httpRetries); attempt++) {
             try {
-                searchClient.search(query, null, null, null);
+                var resp = searchClient.search(query, null, null, null);
+                if (resp.statusCode() != 200) {
+                    throw new IOException("Search failed. Status=" + resp.statusCode() + " Body=" + resp.body());
+                }
                 ok = true;
                 break;
             } catch (ConnectException | java.net.http.HttpTimeoutException e) {
@@ -281,8 +326,8 @@ public class IntegrationBenchmark {
         Options opt1 = new OptionsBuilder()
                 .include(IntegrationBenchmark.class.getSimpleName())
                 .forks(1)
-                .warmupIterations(5)
-                .measurementIterations(8)
+                .warmupIterations(1)
+                .measurementIterations(2)
                 .timeUnit(TimeUnit.MILLISECONDS)
                 .result(SUMMARY_CSV.toString())
                 .resultFormat(ResultFormatType.CSV)
@@ -297,8 +342,8 @@ public class IntegrationBenchmark {
                         .include(IntegrationBenchmark.class.getSimpleName())
                         .mode(org.openjdk.jmh.annotations.Mode.Throughput)
                         .threads(t)
-                        .warmupIterations(5)
-                        .measurementIterations(8)
+                        .warmupIterations(1)
+                        .measurementIterations(2)
                         .timeUnit(TimeUnit.SECONDS)
                         .forks(1)
                         .resultFormat(ResultFormatType.TEXT)
@@ -452,8 +497,8 @@ public class IntegrationBenchmark {
         g.drawString(title, (W - titleW) / 2, 30);
 
         g.setFont(new Font("SansSerif", Font.PLAIN, 13));
-        g.drawLine(L, H - B, L + PW, H - B);         // eje X
-        g.drawLine(L, H - B, L, H - B - PH);         // eje Y
+        g.drawLine(L, H - B, L + PW, H - B);
+        g.drawLine(L, H - B, L, H - B - PH);
 
         String xLab = xLabel == null ? "" : xLabel;
         String yLab = yLabel == null ? "" : yLabel;
