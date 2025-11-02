@@ -3,9 +3,6 @@ package com.tahs.benchmark;
 import com.tahs.clients.IndexingClient;
 import com.tahs.clients.IngestionClient;
 import com.tahs.clients.SearchClient;
-import com.tahs.config.AppConfig;
-import com.tahs.orchestrator.Orchestrator;
-import io.github.cdimascio.dotenv.Dotenv;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.results.RunResult;
 import org.openjdk.jmh.results.format.ResultFormatType;
@@ -37,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 @Fork(1)
 @State(Scope.Benchmark)
 public class IntegrationBenchmark {
+
     @Param({"http://localhost:7070"})
     public String ingestionBaseUrl;
 
@@ -58,7 +56,7 @@ public class IntegrationBenchmark {
     @Param({"false"})
     public boolean failOnTimeout;
 
-    @Param({"300"})
+    @Param({"10"})
     public int maxBooksPerIteration;
 
     private static final String DEVICE =
@@ -75,7 +73,10 @@ public class IntegrationBenchmark {
     private static final Path THRPT_CSV   = DATA_DIR.resolve("integration_throughput_summary_" + DEVICE_SLUG + ".csv");
 
     private HttpClient http;
-    private Orchestrator orchestrator;
+    private IngestionClient ingestionClient;
+    private IndexingClient indexingClient;
+    private SearchClient searchClient;
+
     private List<String> bookIds;
     private Random rnd;
 
@@ -84,10 +85,6 @@ public class IntegrationBenchmark {
 
     @Setup(Level.Trial)
     public void setup() throws Exception {
-        var dotenv = Dotenv.configure()
-                .ignoreIfMissing()
-                .load();
-        var appConfig = CheckEnvVars(dotenv);
         Files.createDirectories(DATA_DIR);
         Files.createDirectories(PLOTS_DIR);
         if (!Files.exists(SAMPLES_CSV)) {
@@ -100,10 +97,9 @@ public class IntegrationBenchmark {
                 .connectTimeout(Duration.ofSeconds(httpTimeoutSec))
                 .build();
 
-        IngestionClient ingestionClient = new IngestionClient(http, appConfig.urlIngestion());
-        IndexingClient  indexingClient  = new IndexingClient(http, appConfig.urlIndex());
-        SearchClient    searchClient    = new SearchClient(http, appConfig.urlSearch());
-        orchestrator = new Orchestrator(ingestionClient, indexingClient, searchClient);
+        ingestionClient = new IngestionClient(http, ingestionBaseUrl);
+        indexingClient  = new IndexingClient(http, indexingBaseUrl);
+        searchClient    = new SearchClient(http, searchBaseUrl);
 
         bookIds = parseRange(bookIdRange);
         rnd = new Random(42);
@@ -112,21 +108,6 @@ public class IntegrationBenchmark {
         int n = Math.min(maxBooksPerIteration, bookIds.size());
         iterBookIds = new ArrayList<>(bookIds.subList(0, n));
         iterCursor = 0;
-    }
-
-    private static AppConfig CheckEnvVars(Dotenv dotenv) {
-        String urlIngestion = Optional.ofNullable(dotenv.get("INGESTION_URL"))
-                .orElse(System.getenv("INGESTION_URL"));
-        String urlIndexing = Optional.ofNullable(dotenv.get("INDEXING_URL"))
-                .orElse(System.getenv("INDEXING_URL"));
-        String urlSearch = Optional.ofNullable(dotenv.get("SEARCH_URL"))
-                .orElse(System.getenv("SEARCH_URL"));
-
-        return new AppConfig(
-                urlIngestion,
-                urlIndexing,
-                urlSearch
-        );
     }
 
     @Setup(Level.Iteration)
@@ -159,36 +140,67 @@ public class IntegrationBenchmark {
     }
 
     @Benchmark
-    public void orchestrate_once() throws Exception {
+    public void ingest_then_index_once() throws Exception {
         String bookId = iterBookIds.get((iterCursor++) % iterBookIds.size());
-        doExecuteAndRecord(bookId);
+        doIngestThenIndexAndRecord(bookId);
     }
 
-    private void doExecuteAndRecord(String bookId) throws Exception {
-        double latencyMs;
+    private void doIngestThenIndexAndRecord(String bookId) throws Exception {
         boolean ok = false;
         Instant t0 = Instant.now();
+
         for (int attempt = 0; attempt < Math.max(1, httpRetries); attempt++) {
             try {
-                orchestrator.execute();
+                ingestionClient.downloadBook(bookId);
+
+                if (!waitUntilIngested(bookId, httpRetries)) {
+                    throw new java.net.http.HttpTimeoutException("ingestion status wait timed out");
+                }
+
+                var resp = indexingClient.updateIndexForBook(bookId);
+                if (resp.statusCode() != 200) {
+                    throw new IOException("Indexing failed. Status=" + resp.statusCode() + " Body=" + resp.body());
+                }
+
                 ok = true;
                 break;
             } catch (ConnectException | java.net.http.HttpTimeoutException e) {
                 if (attempt + 1 < httpRetries) Thread.sleep(200L * (attempt + 1));
             }
         }
+
         Instant t1 = Instant.now();
-        latencyMs = Duration.between(t0, t1).toNanos() / 1_000_000.0;
-        if (!ok && failOnTimeout) throw new java.net.http.HttpTimeoutException("orchestrator timed out after retries=" + httpRetries);
+        double latencyMs = Duration.between(t0, t1).toNanos() / 1_000_000.0;
+
+        if (!ok && failOnTimeout) {
+            throw new java.net.http.HttpTimeoutException("ingest->index sequence timed out after retries=" + httpRetries);
+        }
+
         double cpuPct  = processCpuPercent();
         double usedMb  = usedMemoryMb();
         double totalMb = totalMemoryMb();
+
         synchronized (IntegrationBenchmark.class) {
-            try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(SAMPLES_CSV, StandardCharsets.UTF_8, StandardOpenOption.APPEND))) {
+            try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(
+                    SAMPLES_CSV, StandardCharsets.UTF_8, StandardOpenOption.APPEND))) {
                 w.printf(Locale.US, "%d,%s,%.3f,%.2f,%.2f,%.2f%n",
                         System.currentTimeMillis(), bookId, latencyMs, cpuPct, usedMb, totalMb);
             }
         }
+    }
+
+    private boolean waitUntilIngested(String bookId, int maxPolls) throws Exception {
+        for (int i = 0; i < Math.max(1, maxPolls); i++) {
+            try {
+                var statusResp = ingestionClient.status(bookId);
+                if (statusResp.statusCode() == 200) {
+                    return true;
+                }
+            } catch (ConnectException | java.net.http.HttpTimeoutException e) {
+            }
+            Thread.sleep(200L * (i + 1));
+        }
+        return false;
     }
 
     @Benchmark
@@ -202,7 +214,7 @@ public class IntegrationBenchmark {
         Instant t0 = Instant.now();
         for (int attempt = 0; attempt < Math.max(1, httpRetries); attempt++) {
             try {
-                orchestrator.getSearchClient().search(query, null, null, null);
+                searchClient.search(query, null, null, null);
                 ok = true;
                 break;
             } catch (ConnectException | java.net.http.HttpTimeoutException e) {
@@ -427,7 +439,6 @@ public class IntegrationBenchmark {
         int L = 90, B = 90;
         int PW = W - 2*L;
         int PH = H - B - topMargin;
-
 
         g.setColor(Color.WHITE); g.fillRect(0, 0, W, H);
 
