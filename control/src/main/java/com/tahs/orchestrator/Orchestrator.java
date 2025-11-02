@@ -48,11 +48,15 @@ public class Orchestrator {
                         " and body: " + response.body());
             }
         } else {
-            var bookId = String.valueOf(ThreadLocalRandom.current().nextInt(1, MAX_BOOKS + 1));
-            if (!DownloadTracker.isDownloaded(bookId)) {
-                ingestionClient.downloadBook(bookId);
-                if (checkBookIsDownloaded(bookId)) DownloadTracker.markAsDownloaded(bookId);
+            for (int i = 0; i < MAX_RETRIES; i++) {
+                var bookId = String.valueOf(ThreadLocalRandom.current().nextInt(1, MAX_BOOKS + 1));
+                if (!DownloadTracker.isDownloaded(bookId)) {
+                    ingestionClient.downloadBook(bookId);
+                    if (checkBookIsDownloaded(bookId)) DownloadTracker.markAsDownloaded(bookId);
+                    return;
+                }
             }
+
         }
     }
 
@@ -69,14 +73,10 @@ public class Orchestrator {
     }
 
     private boolean checkBookIsDownloaded(String bookId) throws IOException, InterruptedException {
-        var retry = 0;
-        while (retry < MAX_RETRIES) {
-            var response = this.ingestionClient.status(bookId);
-            if (response.statusCode() == 200) {
-                System.out.println("Book downloaded.");
-                return true;
-            }
-            retry++;
+        var response = this.ingestionClient.status(bookId);
+        if (response.statusCode() == 200) {
+            System.out.println("Book downloaded.");
+            return true;
         }
         return false;
     }
