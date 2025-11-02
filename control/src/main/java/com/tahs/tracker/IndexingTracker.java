@@ -5,10 +5,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class IndexingTracker {
     private static final Path DATA_DIR = Paths.get("control");
-    private static final Path FILE_PATH = Paths.get("indexed_books.txt");
+    private static final Path FILE_PATH = DATA_DIR.resolve("indexed_books.txt");
 
     public static void createFileIfNotExists() throws IOException {
         try {
@@ -40,12 +42,17 @@ public class IndexingTracker {
         }
     }
 
-    public static int countIndexedBooks() {
+    public static List<String> getIndexedBooks() {
         try {
-            return (int) Files.lines(FILE_PATH).count();
+            var indexedBooks = Files.readAllLines(FILE_PATH);
+            return indexedBooks.stream()
+                    .map(String::trim)
+                    .filter(line -> !line.isEmpty())
+                    .collect(Collectors.toList());
+
         } catch (IOException e) {
-            System.err.println("Error reading indexed_books.txt: " + e.getMessage());
-            return 0;
+            System.err.println("Error al leer el archivo: " + e.getMessage());
         }
+        return null;
     }
 }
