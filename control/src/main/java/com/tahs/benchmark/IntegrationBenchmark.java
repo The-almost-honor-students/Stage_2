@@ -170,7 +170,7 @@ public class IntegrationBenchmark {
         Instant t0 = Instant.now();
         for (int attempt = 0; attempt < Math.max(1, httpRetries); attempt++) {
             try {
-                orchestrator.execute(bookId);
+                orchestrator.execute();
                 ok = true;
                 break;
             } catch (ConnectException | java.net.http.HttpTimeoutException e) {
@@ -202,7 +202,7 @@ public class IntegrationBenchmark {
         Instant t0 = Instant.now();
         for (int attempt = 0; attempt < Math.max(1, httpRetries); attempt++) {
             try {
-                orchestrator.getSearchClient().search(query);
+                orchestrator.getSearchClient().search(query, null, null, null);
                 ok = true;
                 break;
             } catch (ConnectException | java.net.http.HttpTimeoutException e) {

@@ -7,14 +7,18 @@ import com.tahs.tracker.DownloadTracker;
 import com.tahs.tracker.IndexingTracker;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 public class Orchestrator {
     private final IngestionClient ingestionClient;
     private final IndexingClient indexingClient;
     private final SearchClient searchClient;
-
-    private static final long MAX_TIMEOUT = System.currentTimeMillis() + 60 * 1000L;
-    private static final int DOWNLOAD_POLL_INTERVAL_MS = 500;
+    private static final int MAX_BOOKS = 70_000;
+    private static final long MAX_RETRIES = 10;
 
     public Orchestrator(IngestionClient ingestionClient,
                         IndexingClient indexingClient,
@@ -24,20 +28,27 @@ public class Orchestrator {
         this.searchClient = searchClient;
     }
 
-    public void execute(String bookId) throws IOException, InterruptedException {
+    public void execute() throws IOException, InterruptedException {
         DownloadTracker.createFileIfNotExists();
         IndexingTracker.createFileIfNotExists();
-
         if (areMissingBooksIndexed()) {
+            var indexedBooks = IndexingTracker.getIndexedBooks();
+            var downloadedBooks = DownloadTracker.getDownloadedBooks();
+            Set<String> indexedSet = new HashSet<>(indexedBooks);
+
+            List<String> notIndexedBooks = downloadedBooks.stream()
+                    .filter(id -> !indexedSet.contains(id))
+                    .collect(Collectors.toList());
+            var bookId = getBookId(notIndexedBooks);
             var response = indexingClient.updateIndexForBook(bookId);
             if (response.statusCode() == 200) {
                 IndexingTracker.markAsIndexed(bookId);
-                waitUntilSearchSeesBook(bookId);
             } else {
                 throw new IOException("Fail with Status: " + response.statusCode() +
                         " and body: " + response.body());
             }
         } else {
+            var bookId = String.valueOf(ThreadLocalRandom.current().nextInt(1, MAX_BOOKS + 1));
             if (!DownloadTracker.isDownloaded(bookId)) {
                 ingestionClient.downloadBook(bookId);
                 if (checkBookIsDownloaded(bookId)) DownloadTracker.markAsDownloaded(bookId);
@@ -45,16 +56,8 @@ public class Orchestrator {
         }
     }
 
-    private void waitUntilSearchSeesBook(String query) throws IOException, InterruptedException {
-        long deadline = System.currentTimeMillis() + 30_000L;
-        while (System.currentTimeMillis() < deadline) {
-            var resp = this.searchClient.search(query);
-            if (resp.statusCode() == 200 && resp.body() != null && !resp.body().isBlank()) {
-                return;
-            }
-            Thread.sleep(DOWNLOAD_POLL_INTERVAL_MS);
-        }
-        throw new IOException("Search not ready for query=" + query);
+    private static String getBookId(List<String> notIndexedBooks) {
+        return notIndexedBooks.stream().findFirst().get();
     }
 
     public SearchClient getSearchClient() {
@@ -62,27 +65,19 @@ public class Orchestrator {
     }
 
     private static boolean areMissingBooksIndexed() {
-        return DownloadTracker.countDownloadedBooks() - IndexingTracker.countIndexedBooks() > 0;
+        return DownloadTracker.getDownloadedBooks().size() - IndexingTracker.getIndexedBooks().size() > 0;
     }
 
     private boolean checkBookIsDownloaded(String bookId) throws IOException, InterruptedException {
-        while (System.currentTimeMillis() < MAX_TIMEOUT) {
+        var retry = 0;
+        while (retry < MAX_RETRIES) {
             var response = this.ingestionClient.status(bookId);
-            if (response.statusCode() == 200 && isDownloadedResponse(response.body())) {
+            if (response.statusCode() == 200) {
                 System.out.println("Book downloaded.");
                 return true;
             }
-            Thread.sleep(DOWNLOAD_POLL_INTERVAL_MS);
+            retry++;
         }
         return false;
-    }
-
-    private static boolean isDownloadedResponse(String body) {
-        if (body == null) return false;
-        String s = body.toLowerCase();
-        return s.contains("\"downloaded\":true")
-                || s.contains("\"ready\":true")
-                || s.contains("\"status\":\"downloaded\"")
-                || s.contains("\"state\":\"downloaded\"");
     }
 }
