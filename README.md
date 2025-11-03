@@ -6,18 +6,17 @@ In this stage, four independent services —**Ingestion**, **Indexing**, **Searc
 ---
 
 ## Table of Contents
-1. [Architecture Overview](#1-architecture-overview)  
-2. [Environment Variables Configuration](#2-environment-variables-configuration)  
+1. [Architecture Overview](#1-architecture-overview)
+2. [Implemented Functionality](#2-implemented-functionality)  
+3. [Environment Variables Configuration](#3-environment-variables-configuration)  
  2.1 [Ingestion Service](#ingestion-service)  
  2.2 [Indexing Service](#indexing-service)  
  2.3 [Search Service](#search-service)  
  2.4 [Control Service](#control-service)  
-3. [Building the Project](#3-building-the-project)  
-4. [Running with Docker](#4-running-with-docker)  
-5. [Example Usage and Test Queries](#5-example-usage-and-test-queries)  
-6. [Benchmarking](#6-benchmarking)  
-7. [Implemented Functionality](#7-implemented-functionality)  
-8. [Next Steps](#8-next-steps)
+4. [Building the Project](#4-building-the-project)  
+5. [Running with Docker](#5-running-with-docker)  
+6. [Example Usage and Test Queries](#6-example-usage-and-test-queries)  
+7. [Benchmarking](#7-benchmarking)  
 
 ---
 
@@ -34,7 +33,21 @@ The project follows **Clean Architecture / Hexagonal Architecture** principles, 
 
 ---
 
-## 2. Environment Variables Configuration
+## 2. Implemented Functionality
+
+- Modular implementation of **Ingestion**, **Indexing**, **Search**, and **Control** services.  
+- REST APIs built with **Javalin**.  
+- Configuration managed via `.env` files under `resources/`.  
+- Persistent data storage in **MongoDB** (`metadata` and `inverted_index` collections).  
+- Text preprocessing and tokenization for indexing.  
+- Workflow orchestration through the **Control Service**.  
+- Integration of **JMH** benchmarking in all modules.  
+- Full Docker containerization with `docker-compose`.  
+- Clear and incremental **Git history** showing contributions and progress.ç
+  
+---
+
+## 3. Environment Variables Configuration
 
 Each service includes its own `.env` file inside the `resources/` directory.  
 These files define URLs, ports, and database parameters without modifying the source code.
@@ -95,7 +108,7 @@ SEARCH_URL=http://localhost:9090
 
 ---
 
-## 3. Building the Project
+## 4. Building the Project
 
 Each microservice is built using **Maven**.
 
@@ -116,7 +129,7 @@ This will generate a JAR file inside each module’s `target` directory.
 
 ---
 
-## 4. Running with Docker
+## 5. Running with Docker
 
 All services are **dockerized** and can be executed independently or together using `docker-compose`.
 
@@ -145,7 +158,7 @@ All services are **dockerized** and can be executed independently or together us
 
 ---
 
-## 5. Example Usage and Test Queries
+## 6. Example Usage and Test Queries
 
 Once the system is running, the services can be tested with tools like **curl** or **Postman** (recommended for easier visualization and testing).  
 Below is a list of all available endpoints and example calls for each one. In case you use Postman, ignore curl calls, just take the examples, like http://localhost:7070/ingest/6036.  
@@ -204,7 +217,7 @@ curl -X POST http://localhost:6060/control/start
 
 ---
 
-## 6. Benchmarking
+## 7. Benchmarking
 
 Performance benchmarking has been implemented in **all services** — Ingestion, Indexing, Search, and Control — using **JMH (Java Microbenchmark Harness)**.  
 Each benchmark evaluates throughput, latency, and scalability under different workloads.
@@ -239,17 +252,6 @@ Benchmark results are printed to the console and may include:
 - Execution time per thread
 - CPU and memory usage across services
 
----
 
-## 7. Implemented Functionality
 
-- Modular implementation of **Ingestion**, **Indexing**, **Search**, and **Control** services.  
-- REST APIs built with **Javalin**.  
-- Configuration managed via `.env` files under `resources/`.  
-- Persistent data storage in **MongoDB** (`metadata` and `inverted_index` collections).  
-- Text preprocessing and tokenization for indexing.  
-- Workflow orchestration through the **Control Service**.  
-- Integration of **JMH** benchmarking in all modules.  
-- Full Docker containerization with `docker-compose`.  
-- Clear and incremental **Git history** showing contributions and progress.
 
