@@ -1,13 +1,11 @@
-"Benchmark","Mode","Threads","Samples","Score","Score Error (99,9%)","Unit","Param: bookIdRange","Param: failOnTimeout","Param: httpRetries","Param: httpTimeoutSec","Param: indexingBaseUrl","Param: ingestionBaseUrl","Param: maxBooksPerIteration","Param: searchBaseUrl"
-"com.tahs.benchmark.IntegrationBenchmark.orchestrate_once","avgt",1,8,"618,476555","1,616609","ms/op",1-70000,false,3,10,http://localhost:8080,http://localhost:7070,300,http://localhost:9090
-"com.tahs.benchmark.IntegrationBenchmark.search_once","avgt",1,8,"616,323959","1,229584","ms/op",1-70000,false,3,10,http://localhost:8080,http://localhost:7070,300,http://localhost:9090
-615.156,614.426,623.975,36.05,81.29
-615.161,614.443,623.949,35.70,80.72
-615.182,614.483,623.859,35.25,80.69
-615.153,614.457,623.808,34.73,79.72
-615.224,614.528,623.838,34.56,79.94
-615.313,614.612,623.990,34.07,79.16
-615.533,614.768,624.516,34.02,79.58
-615.602,614.847,624.526,33.88,79.04
-615.915,615.119,625.163,35.07,79.83
-615.478,614.681,624.933,36.14,79.73
+"Benchmark","Mode","Threads","Samples","Score","Score Error (99,9%)","Unit","Param: bookIdRange","Param: failOnTimeout","Param: httpRetries","Param: httpTimeoutSec","Param: indexingBaseUrl","Param: ingestionBaseUrl","Param: keywordsSource","Param: maxBooksPerIteration","Param: searchBaseUrl"
+"com.tahs.benchmark.IntegrationBenchmark.ingest_then_index_once","avgt",1,5,"169372,702725","994636,238956","ms/op",1-70000,false,3,10,http://localhost:8080,http://localhost:7070,"book science death war love",2,http://localhost:9090
+"com.tahs.benchmark.IntegrationBenchmark.search_once","avgt",1,5,"8,417449","0,237569","ms/op",1-70000,false,3,10,http://localhost:8080,http://localhost:7070,"book science death war love",2,http://localhost:9090
+3332.123,611.432,623.559,23.64,79.52
+2520.022,12.189,622.317,18.07,81.83
+2571.541,12.409,622.357,18.06,81.80
+1937.247,8.505,621.050,14.00,83.23
+2157.514,8.508,621.140,13.98,83.17
+1685.704,11.342,619.973,11.53,84.46
+3637.800,11.371,620.124,11.52,84.37
+3436.168,12.376,619.843,11.08,84.34

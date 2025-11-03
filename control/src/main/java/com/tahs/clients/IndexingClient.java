@@ -16,7 +16,7 @@ public class IndexingClient {
     }
 
     public HttpResponse<String> updateIndexForBook(String bookId) throws IOException, InterruptedException {
-        String urlIndexingBook = this.urlIndexing + "/update/" + bookId;
+        String urlIndexingBook = this.urlIndexing + "/index/update/" + bookId;
         var request = HttpRequest.newBuilder(URI.create(urlIndexingBook))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.noBody()).build();
@@ -25,7 +25,7 @@ public class IndexingClient {
     }
 
     public HttpResponse<String> rebuildIndexForBook() throws IOException, InterruptedException {
-        String urlIndexingBook = this.urlIndexing + "/rebuild";
+        String urlIndexingBook = this.urlIndexing + "/index/rebuild";
         var request = HttpRequest.newBuilder(URI.create(urlIndexingBook))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.noBody()).build();
@@ -33,7 +33,7 @@ public class IndexingClient {
     }
 
     public HttpResponse<String> status() throws IOException, InterruptedException {
-        String urlIndexingBook = this.urlIndexing + "/status";
+        String urlIndexingBook = this.urlIndexing + "/index/status";
         var request = HttpRequest.newBuilder(URI.create(urlIndexingBook))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.noBody()).build();

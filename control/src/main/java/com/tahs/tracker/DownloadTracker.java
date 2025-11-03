@@ -3,7 +3,8 @@ package com.tahs.tracker;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.*;
-import java.util.Optional;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class DownloadTracker {
 
@@ -39,12 +40,17 @@ public class DownloadTracker {
         }
     }
 
-    public static int countDownloadedBooks() {
+    public static List<String> getDownloadedBooks() {
         try {
-            return (int) Files.lines(FILE_PATH).count();
+            var downloadedBooks = Files.readAllLines(FILE_PATH);
+            return downloadedBooks.stream()
+                    .map(String::trim)
+                    .filter(line -> !line.isEmpty())
+                    .collect(Collectors.toList());
+
         } catch (IOException e) {
-            System.err.println("Error reading downloaded_books.txt: " + e.getMessage());
-            return 0;
+            System.err.println("Error al leer el archivo: " + e.getMessage());
         }
+        return null;
     }
 }

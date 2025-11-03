@@ -16,7 +16,7 @@ public class IngestionClient {
     }
 
     public HttpResponse<String> downloadBook(String bookId) throws IOException, InterruptedException {
-        String urlIngestBook = this.urlIngestion + "/" + bookId;
+        String urlIngestBook = this.urlIngestion + "/ingest/" + bookId;
         var request = HttpRequest.newBuilder(URI.create(urlIngestBook))
                 .POST(HttpRequest.BodyPublishers.noBody()).build();
         System.out.println("Download book " + bookId + "...");
@@ -24,7 +24,7 @@ public class IngestionClient {
     }
 
     public HttpResponse<String> status(String bookId) throws IOException, InterruptedException {
-        String urlIndexingBook = this.urlIngestion + "/status/" + bookId;
+        String urlIndexingBook = this.urlIngestion + "/ingest/status/" + bookId;
         var request = HttpRequest.newBuilder(URI.create(urlIndexingBook))
                 .header("Content-Type", "application/json")
                 .GET().build();
@@ -32,7 +32,7 @@ public class IngestionClient {
     }
 
     public HttpResponse<String> list() throws IOException, InterruptedException {
-        String urlIndexingBook = this.urlIngestion + "/list";
+        String urlIndexingBook = this.urlIngestion + "/ingest/list";
         var request = HttpRequest.newBuilder(URI.create(urlIndexingBook))
                 .header("Content-Type", "application/json")
                 .GET().build();

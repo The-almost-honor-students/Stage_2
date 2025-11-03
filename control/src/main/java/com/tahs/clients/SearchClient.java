@@ -20,14 +20,6 @@ public class SearchClient {
         this.urlSearch = urlSearch;
     }
 
-    public HttpResponse<String> search(String q) throws IOException, InterruptedException {
-        String url = this.urlSearch + "/search?q=" + enc(q);
-        var request = HttpRequest.newBuilder(URI.create(url))
-                .GET()
-                .build();
-        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    }
-
     public HttpResponse<String> search(String q, String author, String language, Integer year) throws IOException, InterruptedException {
         Map<String, String> params = new LinkedHashMap<>();
         if (q != null && !q.isBlank()) params.put("q", q);
@@ -39,22 +31,6 @@ public class SearchClient {
         for (var e : params.entrySet()) sj.add(enc(e.getKey()) + "=" + enc(e.getValue()));
 
         String url = this.urlSearch + "/search" + (params.isEmpty() ? "" : "?" + sj);
-        var request = HttpRequest.newBuilder(URI.create(url))
-                .GET()
-                .build();
-        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    }
-
-    public HttpResponse<String> getMetadataById(String bookId) throws IOException, InterruptedException {
-        String url = this.urlSearch + "/metadata/" + enc(bookId);
-        var request = HttpRequest.newBuilder(URI.create(url))
-                .GET()
-                .build();
-        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    }
-
-    public HttpResponse<String> getBooksByTerm(String term) throws IOException, InterruptedException {
-        String url = this.urlSearch + "/index/term?term=" + enc(term);
         var request = HttpRequest.newBuilder(URI.create(url))
                 .GET()
                 .build();
