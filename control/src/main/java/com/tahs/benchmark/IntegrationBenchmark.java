@@ -59,7 +59,7 @@ public class IntegrationBenchmark {
     @Param({"2"})
     public int maxBooksPerIteration;
 
-    @Param({"data big life"})
+    @Param({"book science death war love"})
     public String keywordsSource;
 
     private static final String DEVICE =
@@ -211,7 +211,7 @@ public class IntegrationBenchmark {
                 ok = true;
                 break;
             } catch (ConnectException | java.net.http.HttpTimeoutException e) {
-                if (attempt + 1 < httpRetries) Thread.sleep(200L * (attempt + 1));
+                if (attempt + 1 < httpRetries) Thread.sleep(10 * (attempt + 1));
             }
         }
         Instant t1 = Instant.now();
@@ -326,15 +326,15 @@ public class IntegrationBenchmark {
         Options opt1 = new OptionsBuilder()
                 .include(IntegrationBenchmark.class.getSimpleName())
                 .forks(1)
-                .warmupIterations(1)
-                .measurementIterations(2)
+                .warmupIterations(5)
+                .measurementIterations(10)
                 .timeUnit(TimeUnit.MILLISECONDS)
                 .result(SUMMARY_CSV.toString())
                 .resultFormat(ResultFormatType.CSV)
                 .build();
         new Runner(opt1).run();
 
-        int[] threads = {1, 2, 4, 8, 16};
+        int[] threads = {1,2,4,8};
         try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(THRPT_CSV))) {
             w.println("threads,ops_per_sec");
             for (int t : threads) {
@@ -342,8 +342,8 @@ public class IntegrationBenchmark {
                         .include(IntegrationBenchmark.class.getSimpleName())
                         .mode(org.openjdk.jmh.annotations.Mode.Throughput)
                         .threads(t)
-                        .warmupIterations(1)
-                        .measurementIterations(2)
+                        .warmupIterations(5)
+                        .measurementIterations(10)
                         .timeUnit(TimeUnit.SECONDS)
                         .forks(1)
                         .resultFormat(ResultFormatType.TEXT)
