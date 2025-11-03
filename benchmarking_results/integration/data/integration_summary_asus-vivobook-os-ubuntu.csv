@@ -1,0 +1,13 @@
+"Benchmark","Mode","Threads","Samples","Score","Score Error (99,9%)","Unit","Param: bookIdRange","Param: failOnTimeout","Param: httpRetries","Param: httpTimeoutSec","Param: indexingBaseUrl","Param: ingestionBaseUrl","Param: maxBooksPerIteration","Param: searchBaseUrl"
+"com.tahs.benchmark.IntegrationBenchmark.orchestrate_once","avgt",1,8,"627,800062","31,751150","ms/op",1-70000,false,3,10,http://localhost:8080,http://localhost:7070,300,http://localhost:9090
+"com.tahs.benchmark.IntegrationBenchmark.search_once","avgt",1,8,"611,009842","1,415158","ms/op",1-70000,false,3,10,http://localhost:8080,http://localhost:7070,300,http://localhost:9090
+616.180,611.014,644.855,0.26,31.81
+614.750,610.785,640.523,0.26,30.82
+614.943,610.648,642.350,1.16,36.12
+613.253,609.915,637.283,1.37,34.39
+666.321,610.658,711.176,1.70,43.12
+652.399,609.736,686.397,1.87,40.92
+636.709,607.846,662.814,2.74,54.62
+628.907,606.933,648.297,2.95,57.94
+621.454,606.579,634.252,3.73,66.91
+617.438,606.137,624.892,3.64,69.35
